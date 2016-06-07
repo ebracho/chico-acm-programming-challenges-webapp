@@ -1,4 +1,5 @@
 import os
+import binascii
 from datetime import datetime, timedelta
 from functools import partial
 from sqlalchemy import create_engine, Column, Integer, String, LargeBinary, \
@@ -10,7 +11,7 @@ from flask import request, jsonify
 
 import api
 
-engine = create_engine('sqlite:///api/riker.db')
+engine = create_engine('sqlite:///api/riker.db', echo=True)
 Session = sessionmaker(engine)
 Base = declarative_base()
 
@@ -20,12 +21,12 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(String, primary_key=True)
-    pwhash = Column(LargeBinary)
+    pwhash = Column(String)
     creation_time = Column(DateTime, default=datetime.utcnow)
 
     def __init__(self, id_, password):
         self.id = id_
-        pwhash = generate_password_hash(password)
+        self.pwhash = generate_password_hash(password)
 
     def __repr__(self):
         return 'User: id={0}, creation_time={1}'.format(self.id, self.creation_time)
@@ -48,21 +49,45 @@ class User(Base):
 class ApiSession(Base):
     __tablename__ = 'api_sessions'
     user_id = Column(String, ForeignKey('users.id'))
-    key = Column(LargeBinary, default=partial(os.urandom, 16), primary_key=True)
+    session_key = Column(LargeBinary, default=partial(os.urandom, 16), primary_key=True)
     expiration = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(days=30))
 
     def __repr__(self):
         return 'ApiSession: user_id={0}, expiration={1}'.format(self.user_id, self.expiration)
 
     def is_expired(self):
-        return datetime.utcnow() < self.expiration
+        """Check whether session key has expired"""
+        return datetime.utcnow() > self.expiration
+
+    def get_session_key(self):
+        """Return session key formatted as hex string"""
+        return binascii.hexlify(self.session_key).decode('utf-8')
+
+    @staticmethod
+    def get_session(user_id, key):
+        key = binascii.unhexlify(key)
+        session = Session()
+        api_session = session.query(ApiSession).filter(
+            ApiSession.user_id==user_id and ApiSession.key==key).first()
+        return api_session
 
     @staticmethod
     def validate_session(user_id, key):
+        """Check for unexpired session for given user/key."""
+        api_session = ApiSession.get_session(user_id, key)
+        return False if not api_session else not api_session.is_expired()
+
+    @staticmethod
+    def end_session(user_id, key):
+        """Set expiration of session to present time"""
+        key = binascii.unhexlify(key)
         session = Session()
-        apisession = session.query(ApiSession).filter(
-            Session.user_id==user_id and Session.key==key).first()
-        return False if not apisession else not apisession.is_expired()
+        api_session = session.query(ApiSession).filter(
+            ApiSession.user_id==user_id and ApiSession.key==key).first()
+        if api_session:
+            api_session.expiration = datetime.utcnow()
+            session.commit()
+            
 
 
 class Problem(Base):
@@ -167,7 +192,7 @@ def register():
     user_id = request.form['userId']
     password = request.form['password']
     if not (user_id and password):
-        raise RequestError('Missing parameters.')
+        raise RequestError('Missing parameter(s).')
     if User.by_id(user_id):
         raise RequestError('User {0} already exists.'.format(user_id))
     if not 3 <= len(user_id) <= 15:
@@ -181,3 +206,34 @@ def register():
     return ''
     
 
+@api.blueprint.route('/create-session', methods=['POST'])
+def create_session():
+    """Generate a 30 day api session key"""
+    user_id = request.form['userId']
+    password = request.form['password']
+    if not (user_id and password):
+        raise RequestError('Missing parameter(s).')
+    if not User.auth_user(user_id, password):
+        raise AuthError('Incorrect userId/password.')
+    session = Session()
+    api_session = ApiSession(user_id=user_id)
+    session.add(api_session)
+    session.commit()
+    return jsonify({
+        'sessionKey':api_session.get_session_key(),
+        'expiration':api_session.expiration
+    })
+    
+
+@api.blueprint.route('/end-session', methods=['POST'])
+def end_session():
+    """Ends the specified session"""
+    user_id = request.form['userId']
+    session_key = request.form['sessionKey']
+    if not user_id and session_key:
+        raise RequestError('Missing parameter(s).')
+    if not ApiSession.validate_session(user_id, session_key):
+        raise AuthError('Session does not exist.')
+    ApiSession.end_session(user_id, session_key)
+    return ''
+    

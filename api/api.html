@@ -1,41 +1,13 @@
 <h1>Riker REST API</h1>
 <p><em>api.rikerproject.com</em></p>
 <h2>User Actions</h2>
-<h4>Login</h4>
-<ul>
-<li>method: <strong>POST</strong></li>
-<li>endpoint: <em>api.rikerproject.com/login</em></li>
-<li>params:<ul>
-<li><code>userId</code>: String</li>
-<li><code>password</code>: String</li>
-</ul>
-</li>
-<li>
-<p>response:</p>
-<ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: N/A</li>
-</ul>
-</li>
-<li>failure:<ul>
-<li>code: 401</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>
-<p>description: Authenticates user and begins a session.</p>
-</li>
-</ul>
 <h4>Register</h4>
 <ul>
 <li>method: <strong>POST</strong></li>
 <li>endpoint: <em>api.rikerproject.com/register</em></li>
 <li>params:<ul>
-<li><code>userID</code>: String
-<code></code>password`: String</li>
+<li><code>userId</code>: String</li>
+<li><code>password</code>: String</li>
 </ul>
 </li>
 <li>
@@ -57,6 +29,62 @@
 <p>description: Creates a user account and begins a session.</p>
 </li>
 </ul>
+<h4>Create Session</h4>
+<ul>
+<li>method: <strong>POST</strong></li>
+<li>endpoint: <em>api.rikerproject.com/create-session</em></li>
+<li>params:<ul>
+<li><code>userId</code>: String</li>
+<li><code>password</code>: String</li>
+</ul>
+</li>
+<li>response:<ul>
+<li>success:<ul>
+<li>code: 200</li>
+<li>content: N/A</li>
+</ul>
+</li>
+<li>failure (bad request):<ul>
+<li>code: 400</li>
+<li>content: { <code>errorMsg</code>: String }</li>
+</ul>
+</li>
+<li>failure (bad credentials):<ul>
+<li>code: 401</li>
+<li>content: { <code>errorMsg</code>: String }</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h4>End Session</h4>
+<ul>
+<li>method: <strong>POST</strong></li>
+<li>endpoint: <em>api.rikerproject.com/end-sesson</em></li>
+<li>params:<ul>
+<li><code>userId</code>: String</li>
+<li><code>sessionKey</code>: String</li>
+</ul>
+</li>
+<li>response:<ul>
+<li>success:<ul>
+<li>code: 200</li>
+<li>content: N/A</li>
+</ul>
+</li>
+<li>failure (bad request):<ul>
+<li>code: 400</li>
+<li>content: { <code>errorMsg</code>: String }</li>
+</ul>
+</li>
+<li>failure (bad credentials):<ul>
+<li>code: 401</li>
+<li>content: { <code>errorMsg</code>: String }</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
 <h2>Resource Requests</h2>
 <h4>Problems</h4>
 <ul>
@@ -64,7 +92,7 @@
 <li>endpoint: <em>api.rikerproject.com/problems</em></li>
 <li>params:<ul>
 <li><code>problemID</code>: Int</li>
-<li><code>userID</code>: String</li>
+<li><code>userId</code>: String</li>
 <li><code>limit</code>: Int</li>
 </ul>
 </li>
@@ -73,7 +101,7 @@
 <ul>
 <li>success: <ul>
 <li>code: 200</li>
-<li>content: [ { <code>problemID</code>: Int, <code>userID</code>: String, <code>submissionTime</code>: Int, <code>title</code>: String, <code>prompt</code>: String }, ... ]</li>
+<li>content: [ { <code>problemID</code>: Int, <code>userId</code>: String, <code>submissionTime</code>: Int, <code>title</code>: String, <code>prompt</code>: String }, ... ]</li>
 </ul>
 </li>
 <li>failure (bad request)<ul>
@@ -84,7 +112,7 @@
 </ul>
 </li>
 <li>
-<p>description: Retrieves a list of problem submissions. Optionally filter by <code>userID</code> or <code>problemID</code> (this will only generate 0 or 1 results). <code>limit</code> specifies maximum result count. Results are sorted by <code>submissionTime</code> (Unix UTC). <code>prompt</code> is in markdown format. </p>
+<p>description: Retrieves a list of problem submissions. Optionally filter by <code>userId</code> or <code>problemID</code> (this will only generate 0 or 1 results). <code>limit</code> specifies maximum result count. Results are sorted by <code>submissionTime</code> (Unix UTC). <code>prompt</code> is in markdown format. </p>
 </li>
 </ul>
 <h4>Solutions</h4>
@@ -94,7 +122,7 @@
 <li>params:<ul>
 <li><code>solutionID</code>: Int</li>
 <li><code>problemID</code>: Int</li>
-<li><code>userID</code>: String</li>
+<li><code>userId</code>: String</li>
 <li><code>language</code>: String</li>
 <li><code>validatedOnly</code>: Boolean</li>
 <li><code>limit</code>: Int</li>
@@ -105,7 +133,7 @@
 <ul>
 <li>success: <ul>
 <li>code: 200</li>
-<li>content: [ { <code>solutionID</code>: Int, <code>problemID</code>: Int, <code>userID</code>: Int, <code>submissionTime</code>: Int, <code>title</code>: String, <code>language</code>: String, <code>source</code>: String, <code>validation</code>: String }, ... ]</li>
+<li>content: [ { <code>solutionID</code>: Int, <code>problemID</code>: Int, <code>userId</code>: Int, <code>submissionTime</code>: Int, <code>title</code>: String, <code>language</code>: String, <code>source</code>: String, <code>validation</code>: String }, ... ]</li>
 </ul>
 </li>
 <li>failure (bad request)<ul>
@@ -116,7 +144,7 @@
 </ul>
 </li>
 <li>
-<p>description: Retrieves a list of solutions. Optionally filter by <code>problemID</code>, <code>userID</code>, <code>language</code>, or <code>solutionID</code> (this will only generate 0 or 1 results). <code>validatedOnly</code> specifies whether solution must be validted. <code>limit</code> specifies maximum result count. Results are sorted by <code>submissionTime</code> (Unix UTC).</p>
+<p>description: Retrieves a list of solutions. Optionally filter by <code>problemID</code>, <code>userId</code>, <code>language</code>, or <code>solutionID</code> (this will only generate 0 or 1 results). <code>validatedOnly</code> specifies whether solution must be validted. <code>limit</code> specifies maximum result count. Results are sorted by <code>submissionTime</code> (Unix UTC).</p>
 </li>
 </ul>
 <h4>Comments</h4>
@@ -126,7 +154,7 @@
 <li>params:<ul>
 <li><code>referenceID</code>: Int</li>
 <li><code>referenceType</code>: String       -- <em>"problem"|"solution"</em></li>
-<li><code>userID</code>: String</li>
+<li><code>userId</code>: String</li>
 <li><code>limit</code>: Int</li>
 </ul>
 </li>
@@ -135,7 +163,7 @@
 <ul>
 <li>success:<ul>
 <li>code: 200</li>
-<li>content: [ { <code>userID</code>: String, <code>submissionTime</code>: String, <code>body</code>: String }, ... ]</li>
+<li>content: [ { <code>userId</code>: String, <code>submissionTime</code>: String, <code>body</code>: String }, ... ]</li>
 </ul>
 </li>
 <li>failure (bad request)<ul>
@@ -146,7 +174,7 @@
 </ul>
 </li>
 <li>
-<p>description: Retrieves comments for the specified submission. Filter results by <code>userID</code> or <code>referenceID</code> (this will only generate 0 or 1 results). <code>referenceID</code> is either a problemID or solutionID depending on the value of <code>referenceType</code>. <code>limit</code> specifies maximum result count.</p>
+<p>description: Retrieves comments for the specified submission. Filter results by <code>userId</code> or <code>referenceID</code> (this will only generate 0 or 1 results). <code>referenceID</code> is either a problemID or solutionID depending on the value of <code>referenceType</code>. <code>limit</code> specifies maximum result count.</p>
 </li>
 </ul>
 <h2>Resource Submissions</h2>
