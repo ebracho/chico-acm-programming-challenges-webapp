@@ -1,5 +1,6 @@
 import os
 import binascii
+import json
 from datetime import datetime, timedelta
 from functools import partial
 from sqlalchemy import create_engine, Column, Integer, String, LargeBinary, \
@@ -11,9 +12,14 @@ from flask import request, jsonify
 
 import api
 
-engine = create_engine('sqlite:///api/riker.db', echo=True)
-Session = sessionmaker(engine)
+engine = create_engine('sqlite:///api/riker.db', echo=False)
+DBSession = sessionmaker(engine)
 Base = declarative_base()
+
+
+# Model Helpers
+
+json_pretty_dumps = partial(json.dumps, indent=4)
 
 
 # Models
@@ -29,20 +35,28 @@ class User(Base):
         self.pwhash = generate_password_hash(password)
 
     def __repr__(self):
-        return 'User: id={0}, creation_time={1}'.format(self.id, self.creation_time)
+        return '<User: id={0}, creation_time={1}>'.format(
+            self.id, self.creation_time)
 
     def auth(self, password):
         return check_password_hash(self.pwhash, password)
 
+    def to_dict(self):
+        """Return dict representation of data"""
+        return {
+            'userId': self.id,
+            'creationTime': str(self.creationtime)
+        }
+
     @staticmethod
     def by_id(id_):
-        session = Session()
-        return session.query(User).filter(User.id==id_).first()
+        db_session = DBSession()
+        return db_session.query(User).filter(User.id==id_).first()
 
     @staticmethod
     def auth_user(id_, password):
-        session = Session()
-        user = session.query(User).filter(User.id==id_).first()
+        db_session = DBSession()
+        user = db_session.query(User).filter(User.id==id_).first()
         return False if not user else user.auth(password)
             
 
@@ -53,42 +67,57 @@ class ApiSession(Base):
     expiration = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(days=30))
 
     def __repr__(self):
-        return 'ApiSession: user_id={0}, expiration={1}'.format(self.user_id, self.expiration)
+        return '<ApiSession: user_id={0}, expiration={1}>'.format(
+            self.user_id, self.expiration)
 
     def is_expired(self):
         """Check whether session key has expired"""
         return datetime.utcnow() > self.expiration
 
-    def get_session_key(self):
+    def get_key(self):
         """Return session key formatted as hex string"""
         return binascii.hexlify(self.session_key).decode('utf-8')
 
+    def to_dict(self):
+        """Return dict representation of data"""
+        return {
+            'userId': self.user_id,
+            'sessionKey': self.get_key(),
+            'expiration': str(self.expiration)
+        }
+
     @staticmethod
-    def get_session(user_id, key):
+    def get_session(key):
+        """Return session object with given api session key"""
         key = binascii.unhexlify(key)
-        session = Session()
-        api_session = session.query(ApiSession).filter(
-            ApiSession.user_id==user_id and ApiSession.key==key).first()
+        db_session = DBSession()
+        api_session = db_session.query(ApiSession).filter(
+            ApiSession.session_key==key).first()
         return api_session
 
     @staticmethod
-    def validate_session(user_id, key):
+    def get_user_id(key):
+        """Return the user id bound to api session key"""
+        api_session = ApiSession.get_session(key)
+        return api_session.user_id if api_session else None
+
+    @staticmethod
+    def validate_session(key):
         """Check for unexpired session for given user/key."""
-        api_session = ApiSession.get_session(user_id, key)
+        api_session = ApiSession.get_session(key)
         return False if not api_session else not api_session.is_expired()
 
     @staticmethod
-    def end_session(user_id, key):
-        """Set expiration of session to present time"""
-        key = binascii.unhexlify(key)
-        session = Session()
-        api_session = session.query(ApiSession).filter(
-            ApiSession.user_id==user_id and ApiSession.key==key).first()
-        if api_session:
+    def end_session(key):
+        """Set expiration of valid session to present time"""
+        if ApiSession.validate_session(key):
+            key = binascii.unhexlify(key)
+            db_session = DBSession()
+            api_session = db_session.query(ApiSession).filter(
+                ApiSession.session_key==key).first()
             api_session.expiration = datetime.utcnow()
-            session.commit()
+            db_session.commit()
             
-
 
 class Problem(Base):
     __tablename__ = 'problems'
@@ -99,59 +128,90 @@ class Problem(Base):
     prompt = Column(String)
     test_input = Column(String)
     test_output = Column(String)
+    timeout = Column(Integer, default=3)
 
     def __repr__(self):
-        return 'Problem: title="{0}", author={1}'.format(self.title, self.user_id)
+        return '<Problem: title="{0}", author={1}>'.format(
+        self.title, self.user_id)
+
+    def to_dict(self):
+        """Return dict representation of data"""
+        return {
+            'userId': self.user_id,
+            'creationTime': str(self.creation_time),
+            'problemId': self.id,
+            'prompt': self.prompt,
+            'testInput': self.test_input,
+            'testOutput': self.test_output,
+            'timeout': self.timeout,
+        }
 
 
 class Solution(Base):
     __tablename__ = 'solutions'
     id = Column(Integer, primary_key=True)
-    user_id = Column(String, ForeignKey('users.id'))
-    creation_time = Column(DateTime, default=datetime.utcnow)
     problem_id = Column(Integer, ForeignKey('problems.id'))
     language = Column(String)
     source = Column(String)
     verification = Column(String)
+    user_id = Column(String, ForeignKey('users.id'))
+    creation_time = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        return 'Solution: author={0}'.format(self.user_id)
+        return '<Solution: author={0}>'.format(self.user_id)
+
+    def to_dict(self):
+        return {
+            'userId': self.user_id,
+            'creationTime': str(self.creation_time),
+            'solutionId': self.id,
+            'problemId': self.problem_id,
+            'language': self.language,
+            'source': self.source,
+            'verification': self.verification,
+        }
 
 
 class ProblemComment(Base):
     __tablename__ = 'problem_comments'
-    user_id = Column(String, ForeignKey('users.id'), primary_key=True)
-    creation_time = Column(DateTime, default=datetime.utcnow, primary_key=True)
     problem = Column(Integer, ForeignKey('problems.id'))
     body = Column(String)
+    user_id = Column(String, ForeignKey('users.id'), primary_key=True)
+    creation_time = Column(DateTime, default=datetime.utcnow, primary_key=True)
+
+    def __repr__(self):
+        return '<ProblemComment: problem={0}, user={1}, time={2}>'.format(
+            self.problem, self.user_id, self.creation_time)
+
+    def to_dict(self):
+        return {
+            'userId': self.user_id,
+            'creationTime': str(self.creation_time),
+            'problem': self.problem,
+            'body': self.body,
+        }
 
 
 class SolutionComment(Base):
     __tablename__ = 'solution_comments'
+    solution = Column(Integer, ForeignKey('solutions.id'))
+    body = Column(String)
     user_id = Column(String, ForeignKey('users.id'), primary_key=True)
     creation_time = Column(DateTime, default=datetime.utcnow, primary_key=True)
-    problem = Column(Integer, ForeignKey('solutions.id'))
-    body = Column(String)
 
+    def __repr__(self):
+        return '<SolutionComment: solution={0}, user={1}, time={2}>'.format(
+            self.solution, self.user_id, self.creation_time)
+
+    def to_dict(self):
+        return {
+            'userId': self.user_id,
+            'creationTime': str(self.creation_time),
+            'solution': self.solution,
+            'body': self.body,
+        }
 
 Base.metadata.create_all(engine)
-
-
-# Route Helpers
-
-def camelify(s):
-    """Convert snake_case string to camelCase."""
-    parts = s.split('_')
-    return parts[0] + ''.join(p.capitalize() for p in parts[1:])
-
-def camelify_object(obj):
-    """Recursively camelify keys of obj"""
-    if isinstance(obj, dict):
-        return { camelify(k):camelify_object(obj[k]) for k in obj }
-    elif isinstance(obj, list):
-        return [ camelify_object(o) for o in obj ]
-    else:
-        return obj
 
 
 # Route exceptions and error handlers
@@ -199,41 +259,76 @@ def register():
         raise RequestError('Invalid user id length.')
     if not 7 <= len(password) <= 128:
         raise RequestError('Invalid password length.')
-    session = Session()
-    new_user = User(id_=user_id, password=password)
-    session.add(new_user)
-    session.commit()
+    db_session = DBSession()
+    new_user = User(user_id, password)
+    db_session.add(new_user)
+    db_session.commit()
     return ''
     
 
-@api.blueprint.route('/create-session', methods=['POST'])
-def create_session():
+@api.blueprint.route('/start-session', methods=['POST'])
+def start_session():
     """Generate a 30 day api session key"""
-    user_id = request.form['userId']
-    password = request.form['password']
+    user_id = request.headers.get('userId', None)
+    password = request.headers.get('password', None)
     if not (user_id and password):
         raise RequestError('Missing parameter(s).')
     if not User.auth_user(user_id, password):
         raise AuthError('Incorrect userId/password.')
-    session = Session()
+    db_session = DBSession()
     api_session = ApiSession(user_id=user_id)
-    session.add(api_session)
-    session.commit()
-    return jsonify({
-        'sessionKey':api_session.get_session_key(),
-        'expiration':api_session.expiration
-    })
+    db_session.add(api_session)
+    db_session.commit()
+    return jsonify(api_session.to_dict())
     
 
 @api.blueprint.route('/end-session', methods=['POST'])
 def end_session():
     """Ends the specified session"""
-    user_id = request.form['userId']
-    session_key = request.form['sessionKey']
-    if not user_id and session_key:
+    api_session_key = request.headers.get('sessionKey', None)
+    if api_session_key is None:
         raise RequestError('Missing parameter(s).')
-    if not ApiSession.validate_session(user_id, session_key):
+    if not ApiSession.validate_session(api_session_key):
         raise AuthError('Session does not exist.')
-    ApiSession.end_session(user_id, session_key)
+    ApiSession.end_session(api_session_key)
     return ''
     
+
+@api.blueprint.route('/problems', methods=['GET','POST'])
+def problems():
+    """Retrieve or create problem(s)"""
+    if request.method == 'GET':
+        problem_id = request.args.get('problemId', None)
+        user_id = request.args.get('userId', None)
+        limit = request.args.get('limit', None)
+        db_session = DBSession()
+        problems = db_session.query(Problem)
+        if problem_id is not None:
+            problems = problems.filter(id=problem_id)
+        if user_id is not None:
+            problems = problems.filter(user_id=user_id)
+        if limit is not None:
+            problems = problems.limit(limit)
+        return jsonify([problem.to_dict() for problem in problems.all()])
+        
+    else: # POST
+        title = request.form.get('title', None)
+        prompt = request.form.get('prompt', None)
+        test_input = request.form.get('testInput', '')
+        test_output = request.form.get('testOutput', '')
+        timeout = request.form.get('timeout', 3)
+        api_session_key = request.headers.get('sessionKey', None)
+        if title is None or prompt is None or api_session_key is None:
+            raise RequestError('Missing parameter(s).')
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+        user_id = ApiSession.get_user_id(api_session_key)
+        db_session = DBSession()
+        problem = Problem(
+            title=title, prompt=prompt, test_input=test_input, 
+            test_output=test_output, timeout=timeout, user_id=user_id)
+        db_session.add(problem)
+        db_session.commit()
+        return ''
+        
+
