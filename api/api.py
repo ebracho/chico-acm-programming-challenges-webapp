@@ -221,7 +221,7 @@ class RequestError(Exception):
 
 def build_error_message(msg):
     """Return json error string"""
-    return {'errorMsg':msg}
+    return {'errorMsg': msg}
 
 @api.blueprint.errorhandler(AuthError)
 def autherror_handler(e):
@@ -248,12 +248,14 @@ def register():
     password = request.form['password']
     if not (user_id and password):
         raise RequestError('Missing parameter(s).')
+
     if User.by_id(user_id):
         raise RequestError('User {0} already exists.'.format(user_id))
     if not 3 <= len(user_id) <= 15:
         raise RequestError('Invalid user id length.')
     if not 7 <= len(password) <= 128:
         raise RequestError('Invalid password length.')
+
     db_session = DBSession()
     new_user = User(user_id, password)
     db_session.add(new_user)
@@ -264,27 +266,38 @@ def register():
 @api.blueprint.route('/start-session', methods=['POST'])
 def start_session():
     """Generate a 30 day api session key"""
+    # Parse request args
     user_id = request.headers.get('userId', None)
     password = request.headers.get('password', None)
     if not (user_id and password):
         raise RequestError('Missing parameter(s).')
+
+    # Validate user credentials
     if not User.auth_user(user_id, password):
         raise AuthError('Incorrect userId/password.')
+
+    # Create api session key
     db_session = DBSession()
     api_session = ApiSession(user_id=user_id)
     db_session.add(api_session)
     db_session.commit()
+
+    # Serialize and return session data
     return jsonify(api_session.to_dict())
     
 
 @api.blueprint.route('/end-session', methods=['POST'])
 def end_session():
     """Ends the specified session"""
+    # Parse request args
     api_session_key = request.headers.get('sessionKey', None)
     if api_session_key is None:
         raise RequestError('Missing parameter(s).')
+
+    # Validate api session
     if not ApiSession.validate_session(api_session_key):
         raise AuthError('Session does not exist.')
+
     ApiSession.end_session(api_session_key)
     return ''
     
@@ -293,28 +306,38 @@ def end_session():
 def problems():
     """Retrieve or create problem(s)"""
     if request.method == 'GET':
+        # Parse query-string arguments
         user_id = request.args.get('userId', None)
         limit = request.args.get('limit', None)
+
+        # Retrieve resource(s) by applying specified filters
         db_session = DBSession()
         problems = db_session.query(Problem)
         if user_id is not None:
             problems = problems.filter(user_id=user_id)
         if limit is not None:
             problems = problems.limit(limit)
+
+        # Serialize and return resource(s)
         return jsonify([problem.to_dict() for problem in problems.all()])
         
     else: # request.method == POST
+        # Parse form arguments
         title = request.form.get('title', None)
         prompt = request.form.get('prompt', None)
         test_input = request.form.get('testInput', '')
         test_output = request.form.get('testOutput', '')
         timeout = request.form.get('timeout', 3)
-        api_session_key = request.headers.get('sessionKey', None)
         if title is None or prompt is None or api_session_key is None:
             raise RequestError('Missing parameter(s).')
+
+        # Validate api session
+        api_session_key = request.headers.get('sessionKey', None)
         if not ApiSession.validate_session(api_session_key):
             raise AuthError('Invalid or expired session key.')
         user_id = ApiSession.get_user_id(api_session_key)
+
+        # Create and write resource
         db_session = DBSession()
         problem = Problem(
             title=title, prompt=prompt, test_input=test_input, 
