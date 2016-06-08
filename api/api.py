@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, Column, Integer, String, LargeBinary, \
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from werkzeug import generate_password_hash, check_password_hash
-from flask import request, jsonify
+from flask import request, abort, jsonify
 
 import api
 
@@ -381,4 +381,33 @@ def problem_by_id(problem_id):
         db_session.delete(problem)
         db_session.commit()
         return ''
+
+
+@api.blueprint.route('/solutions', methods=['GET','POST'])
+def solutions():
+    if request.method == 'GET':
+        # Parse request args
+        problem_id = request.args.get('problemId', None)
+        user_id = request.args.get('userId', None)
+        language = request.args.get('language', None)
+        verified_only = request.args.get('verifiedOnly', False)
+        limit = request.args.get('limit', None)
+
+        # Build select query
+        db_session = DBSession()
+        solutions = db_session.query(Solution)
+        if problem_id:
+            solutions = solutions.filter(Solution.problem_id=problem_id)
+        if user_id:
+            solutions = solutions.filter(Solution.user_id=user_id)
+        if language:
+            solutions = solutions.filter(Solution.language=language)
+        if verified_only: 
+            solutions = solutions.filter(Solution.verified_only=verified_only)
+        if limit:
+            solutions = solutions.limit(limit)
+        
+        # Execute query and serialize data
+        response_body = jsonify([s.to_dict() for s in solutions.all()])
+        return response_body
 
