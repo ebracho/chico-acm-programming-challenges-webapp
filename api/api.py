@@ -347,7 +347,7 @@ def problems():
         return ''
 
 
-@api.blueprint.route('/problems/<problem_id>', methods=['GET','DEL'])
+@api.blueprint.route('/problems/<problem_id>', methods=['GET','DELETE'])
 def problem_by_id(problem_id):
     if request.method == 'GET':
         # Retrieve resource
@@ -360,7 +360,7 @@ def problem_by_id(problem_id):
         # Serialize and return resource
         return jsonify(problem.to_dict())
 
-    else: # request.method == DEL
+    else: # request.method == DELETE
         # Validate api session key
         api_session_key = request.headers.get('sessionKey', None)
         if api_session_key is None:
