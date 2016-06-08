@@ -267,8 +267,8 @@ def register():
 def start_session():
     """Generate a 30 day api session key"""
     # Parse request args
-    user_id = request.headers.get('userId', None)
-    password = request.headers.get('password', None)
+    user_id = request.form.get('userId', None)
+    password = request.form.get('password', None)
     if not (user_id and password):
         raise RequestError('Missing parameter(s).')
 
@@ -299,6 +299,7 @@ def end_session():
         raise AuthError('Session does not exist.')
 
     ApiSession.end_session(api_session_key)
+
     return ''
     
 
@@ -310,18 +311,18 @@ def problems():
         user_id = request.args.get('userId', None)
         limit = request.args.get('limit', None)
 
-        # Retrieve resource(s) by applying specified filters
+        # Build select query
         db_session = DBSession()
         problems = db_session.query(Problem)
         if user_id is not None:
-            problems = problems.filter(user_id=user_id)
+            problems = problems.filter(Problem.user_id == user_id)
         if limit is not None:
             problems = problems.limit(limit)
 
         # Serialize and return resource(s)
         return jsonify([problem.to_dict() for problem in problems.all()])
         
-    else: # request.method == POST
+    else: # request.method == 'POST'
         # Parse form arguments
         title = request.form.get('title', None)
         prompt = request.form.get('prompt', None)
@@ -344,6 +345,7 @@ def problems():
             test_output=test_output, timeout=timeout, user_id=user_id)
         db_session.add(problem)
         db_session.commit()
+
         return ''
 
 
@@ -380,6 +382,7 @@ def problem_by_id(problem_id):
         # Delete resource
         db_session.delete(problem)
         db_session.commit()
+
         return ''
 
 
@@ -397,13 +400,13 @@ def solutions():
         db_session = DBSession()
         solutions = db_session.query(Solution)
         if problem_id:
-            solutions = solutions.filter(Solution.problem_id=problem_id)
+            solutions = solutions.filter(Solution.problem_id == problem_id)
         if user_id:
-            solutions = solutions.filter(Solution.user_id=user_id)
+            solutions = solutions.filter(Solution.user_id == user_id)
         if language:
-            solutions = solutions.filter(Solution.language=language)
+            solutions = solutions.filter(Solution.language == language)
         if verified_only: 
-            solutions = solutions.filter(Solution.verified_only=verified_only)
+            solutions = solutions.filter(Solution.verified_only == verified_only)
         if limit:
             solutions = solutions.limit(limit)
         
@@ -411,3 +414,34 @@ def solutions():
         response_body = jsonify([s.to_dict() for s in solutions.all()])
         return response_body
 
+    else: # request.method == 'POST'
+        # Parse request args
+        problem_id = request.form.get('problemId', None)
+        language = request.form.get('language', None)
+        source = request.form.get('source', None)
+        if problem_id is None or language is None or source is None:
+            raise RequestError('Missing parameter(s)')
+
+        # Validate api session
+        api_session_key = request.headers.get('sessionKey', '')
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key')
+        user_id = ApiSession.get_user_id(api_session_key)
+        
+        # Check whether problem exists
+        db_session = DBSession()
+        problem = db_session.query(Problem).filter(
+            Problem.id == problem_id).first()
+        if problem is None:
+            raise RequestError('Problem does not exist.')
+
+        # Create solution
+        solution = Solution(
+            problem_id=problem_id, language=language, source=source, 
+            user_id=user_id, verification='pending')
+        db_session.add(solution)
+        db_session.commit()
+
+        return ''
+        
+        
