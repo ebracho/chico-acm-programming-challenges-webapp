@@ -298,13 +298,10 @@ def end_session():
 def problems():
     """Retrieve or create problem(s)"""
     if request.method == 'GET':
-        problem_id = request.args.get('problemId', None)
         user_id = request.args.get('userId', None)
         limit = request.args.get('limit', None)
         db_session = DBSession()
         problems = db_session.query(Problem)
-        if problem_id is not None:
-            problems = problems.filter(id=problem_id)
         if user_id is not None:
             problems = problems.filter(user_id=user_id)
         if limit is not None:
@@ -330,5 +327,18 @@ def problems():
         db_session.add(problem)
         db_session.commit()
         return ''
-        
+
+
+@api.blueprint.route('/problems/<problem_id>', methods=['GET','DEL'])
+def problem_by_id(problem_id):
+    if request.method == 'GET'
+        db_session = DBSession()
+        problem = db_session.query(Problem).filter(
+            Problem.id == problem_id).first()
+        if problem is None:
+            abort(404)
+        return jsonify(problem.to_dict())
+
+    else # method == DEL
+        return 'coming soon'
 
