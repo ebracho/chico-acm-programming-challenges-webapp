@@ -17,11 +17,6 @@ DBSession = sessionmaker(engine)
 Base = declarative_base()
 
 
-# Model Helpers
-
-json_pretty_dumps = partial(json.dumps, indent=4)
-
-
 # Models
 
 class User(Base):
@@ -308,7 +303,7 @@ def problems():
             problems = problems.limit(limit)
         return jsonify([problem.to_dict() for problem in problems.all()])
         
-    else: # POST
+    else: # request.method == POST
         title = request.form.get('title', None)
         prompt = request.form.get('prompt', None)
         test_input = request.form.get('testInput', '')
@@ -331,14 +326,36 @@ def problems():
 
 @api.blueprint.route('/problems/<problem_id>', methods=['GET','DEL'])
 def problem_by_id(problem_id):
-    if request.method == 'GET'
+    if request.method == 'GET':
+        # Retrieve resource
         db_session = DBSession()
         problem = db_session.query(Problem).filter(
             Problem.id == problem_id).first()
         if problem is None:
             abort(404)
+
+        # Serialize and return resource
         return jsonify(problem.to_dict())
 
-    else # method == DEL
-        return 'coming soon'
+    else: # request.method == DEL
+        # Validate api session key
+        api_session_key = request.headers.get('sessionKey', None)
+        if api_session_key is None:
+            raise RequestError('Missing parameter(s).')
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+
+        # Determine whether resource is owned by user
+        db_session = DBSession()
+        problem = db_session.query(Problem).filter(
+            Problem.id == problem_id).first()
+        if problem is None:
+            abort(404)
+        if ApiSession.get_user_id(api_session_key) != problem.user_id:
+            raise AuthError('Resource not owned by user.')
+
+        # Delete resource
+        db_session.delete(problem)
+        db_session.commit()
+        return ''
 
