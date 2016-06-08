@@ -351,35 +351,25 @@ def problems():
 
 @api.blueprint.route('/problems/<problem_id>', methods=['GET','DELETE'])
 def problem_by_id(problem_id):
-    if request.method == 'GET':
-        # Retrieve resource
-        db_session = DBSession()
-        problem = db_session.query(Problem).filter(
-            Problem.id == problem_id).first()
-        if problem is None:
-            abort(404)
+    db_session = DBSession()
+    problem = db_session.query(Problem).filter(
+        Problem.id == problem_id).first()
+    if problem is None:
+        abort(404)
 
-        # Serialize and return resource
+    if request.method == 'GET':
         return jsonify(problem.to_dict())
 
-    else: # request.method == DELETE
-        # Validate api session key
+    else: # request.method == 'DELETE'
         api_session_key = request.headers.get('sessionKey', None)
         if api_session_key is None:
             raise RequestError('Missing parameter(s).')
         if not ApiSession.validate_session(api_session_key):
             raise AuthError('Invalid or expired session key.')
 
-        # Determine whether resource is owned by user
-        db_session = DBSession()
-        problem = db_session.query(Problem).filter(
-            Problem.id == problem_id).first()
-        if problem is None:
-            abort(404)
         if ApiSession.get_user_id(api_session_key) != problem.user_id:
             raise AuthError('Resource not owned by user.')
 
-        # Delete resource
         db_session.delete(problem)
         db_session.commit()
 
