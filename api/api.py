@@ -423,9 +423,11 @@ def solutions():
             raise RequestError('Missing parameter(s)')
 
         # Validate api session
-        api_session_key = request.headers.get('sessionKey', '')
+        api_session_key = request.headers.get('sessionKey', None)
+        if api_session_key is None:
+            raise AuthError('No session key provided.')
         if not ApiSession.validate_session(api_session_key):
-            raise AuthError('Invalid or expired session key')
+            raise AuthError('Invalid or expired session key.')
         user_id = ApiSession.get_user_id(api_session_key)
         
         # Check whether problem exists
@@ -445,3 +447,24 @@ def solutions():
         return ''
         
         
+@api.blueprint.route('/solutions/<solution_id>', methods=['GET','DELETE'])
+def solution_by_id(solution_id):
+    db_session = DBSession()
+    solution = db_session.query(Solution).filter(Solution.id == solution_id)
+    if solution is None:
+        abort(404)
+
+    if request.method == 'GET':
+        return jsonify(solution.to_dict())
+    
+    else: # request.method == 'DELETE'
+        api_session_key = request.headers.get('sessionKey', None)
+        if api_session_key is None:
+            raise RequestError('No session key provided.')
+        elif not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+
+        session.delete(solution)
+        session.commit()
+
+        return ''
