@@ -12,7 +12,7 @@ from flask import request, abort, jsonify
 
 import api
 
-engine = create_engine('sqlite:///api/riker.db', echo=False)
+engine = create_engine('sqlite:///api/riker.db', echo=True)
 DBSession = sessionmaker(engine)
 Base = declarative_base()
 
@@ -169,10 +169,11 @@ class Solution(Base):
 
 class ProblemComment(Base):
     __tablename__ = 'problem_comments'
-    problem = Column(Integer, ForeignKey('problems.id'))
+    id = Column(Integer, primary_key=True)
+    problem_id = Column(Integer, ForeignKey('problems.id'))
     body = Column(String)
-    user_id = Column(String, ForeignKey('users.id'), primary_key=True)
-    creation_time = Column(DateTime, default=datetime.utcnow, primary_key=True)
+    user_id = Column(String, ForeignKey('users.id'))
+    creation_time = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return '<ProblemComment: problem={0}, user={1}, time={2}>'.format(
@@ -182,17 +183,19 @@ class ProblemComment(Base):
         return {
             'userId': self.user_id,
             'creationTime': str(self.creation_time),
-            'problem': self.problem,
+            'problemCommentId': self.id,
+            'problem_id': self.problem_id,
             'body': self.body,
         }
 
 
 class SolutionComment(Base):
     __tablename__ = 'solution_comments'
-    solution = Column(Integer, ForeignKey('solutions.id'))
+    id = Column(Integer, primary_key=True)
+    solution_id = Column(Integer, ForeignKey('solutions.id'))
     body = Column(String)
-    user_id = Column(String, ForeignKey('users.id'), primary_key=True)
-    creation_time = Column(DateTime, default=datetime.utcnow, primary_key=True)
+    user_id = Column(String, ForeignKey('users.id'))
+    creation_time = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return '<SolutionComment: solution={0}, user={1}, time={2}>'.format(
@@ -202,9 +205,11 @@ class SolutionComment(Base):
         return {
             'userId': self.user_id,
             'creationTime': str(self.creation_time),
-            'solution': self.solution,
+            'solutionCommentId': self.id,
+            'solution_id': self.solution_id,
             'body': self.body,
         }
+
 
 Base.metadata.create_all(engine)
 
@@ -449,12 +454,128 @@ def solution_by_id(solution_id):
     
     else: # request.method == 'DELETE'
         api_session_key = request.headers.get('sessionKey', None)
+
         if api_session_key is None:
             raise RequestError('No session key provided.')
-        elif not ApiSession.validate_session(api_session_key):
+        if not ApiSession.validate_session(api_session_key):
             raise AuthError('Invalid or expired session key.')
+        if ApiSession.get_user_id(api_session_key) != solution.user_id:
+            raise AuthError('Resource not owned by user.')
 
         session.delete(solution)
         session.commit()
 
         return ''
+
+
+@api.blueprint.route('/problems/<problem_id>/comments', methods=['GET','POST'])
+def problem_comments(problem_id):
+    db_session = DBSession()
+
+    if request.method == 'GET':
+        comments = db_session.query(ProblemComment).filter(
+            ProblemComment.id == problem_id).all()
+
+        response_body = jsonify([c.to_dict() for c in comments])
+        return response_body
+
+    else: # request.method == 'POST'
+
+        api_session_key = request.headers.get('sessionKey', None)
+        if api_session_key is None:
+            raise AuthError('No session key provided.')
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+        
+        user_id = ApiSession.get_user_id(api_session_key)
+        comment = ProblemComment(
+            problem_id=problem_id, user_id=user_id, body=body)
+
+        db_session.add(comment)
+        db_session.commit()
+
+        return jsonify(comment.to_dict())
+
+
+@api.blueprint.route('/problems/comments/<comment_id>', methods=['GET','DELETE'])
+def problem_comments_by_id(comment_id):
+    db_session = DBSession()
+    comment = db_session.query(ProblemComment).filter(
+        ProblemComment.id == comment_id).first()
+        
+    if problem_comment is None:
+        abort(404)
+
+    if request.method == 'GET':
+        return jsonify(problem_comment.to_dict())
+    
+    else: # request.method == 'DELETE'
+        api_session_key = request.headers.get('sessionKey', None)
+        if api_session_key is None:
+            raise AuthError('No session key provided.')
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+        if ApiSession.get_user_id(api_session_key) != comment.user_id:
+            raise AuthError('Resource not owned by user.')
+    
+        session.delete(comment)
+        session.commit()
+    
+        return ''
+
+
+@api.blueprint.route('/solution/<solution_id>/comments', methods=['GET','POST'])
+def solution_comments(solution_id):
+    db_session = DBSession()
+
+    if request.method == 'GET':
+        comments = db_session.query(SolutionComment).filter(
+            SolutionComment.id == solution_id)
+
+        response_body = jsonify([c.to_dict() for c in comments.all()])
+        return response_body
+
+    else: # request.method == 'POST'
+
+        api_session_key = request.headers.get('sessionKey', None)
+        if api_session_key is None:
+            raise AuthError('No session key provided.')
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+        
+        user_id = ApiSession.get_user_id(api_session_key)
+        comment = SolutionComment(
+            solution_id=solution_id, user_id=user_id, body=body)
+
+        db_session.add(comment)
+        db_session.commit()
+
+        return jsonify(comment.to_dict())
+
+
+@api.blueprint.route('/solutions/comments/<comment_id>', methods=['GET','DELETE'])
+def solution_comments_by_id(comment_id):
+    db_session = DBSession()
+    comment = db_session.query(SolutionComment).filter(
+        SolutionComment.id == comment_id).first()
+        
+    if problem_comment is None:
+        abort(404)
+
+    if request.method == 'GET':
+        return jsonify(comment.to_dict())
+    
+    else: # request.method == 'DELETE'
+        api_session_key = request.headers.get('sessionKey', None)
+        if api_session_key is None:
+            raise AuthError('No session key provided.')
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+        if ApiSession.get_user_id(api_session_key) != problem_comment.user_id:
+            raise AuthError('Resource not owned by user.')
+    
+        session.delete(comment)
+        session.commit()
+    
+        return ''
+
