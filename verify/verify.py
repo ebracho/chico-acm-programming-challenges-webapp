@@ -20,7 +20,9 @@ class ProgramTimeout(Exception):
     pass
 
 
-docker_run_cmd = 'docker run --net=none -m 500m --ulimit nproc=30 -v {0}:/home/unprivileged -w /home/unprivileged -e LANGUAGE={1} verify /bin/bash entry'
+docker_run_cmd = 'docker run --net=none -m 500m --ulimit nproc=30 \
+    -v {0}:/home/unprivileged -w /home/unprivileged -e LANGUAGE={1} \
+    verify /bin/bash entry'
 
 def run_program(language, source, testinput, timeout=3):
     """
@@ -112,19 +114,4 @@ class VerifyQueue:
     def __del__(self):
         self.join()
         self.pool.close()
-        
-
-
-
-def callback(status):
-    print(status)
-
-vq = VerifyQueue(processes=4)
-for _ in range(10):
-    vq.put('python', 'while True: pass', '', 'hello world', callback)
-vq.join()
-
-print('Putting forkbomb on queue')
-vq.put('python', 'import os; while True: os.fork()', '', 'hello world', callback)
-vq.join()
 
