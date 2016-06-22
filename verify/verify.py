@@ -2,7 +2,7 @@
 
 import os, shutil, shlex, subprocess
 from tempfile import TemporaryDirectory
-import multiprocessing as mp
+import multiprocess as mp
 
 
 supported_languages = ('c', 'c++', 'python', 'ruby', 'bash')
@@ -61,7 +61,7 @@ def run_program(language, source, testinput, timeout=3):
     return proc_obj.stdout[:-1] # Remove trailing newline
 
 
-def verify(language, source, testinput, testoutput, callback, timeout=3):
+def verify(language, source, testinput, testoutput, timeout=3):
     """
     Wrapper for `run_program` that compares program output with `testoutput`.
     Invokes `callback` with an appropriate status message after call to
@@ -76,42 +76,5 @@ def verify(language, source, testinput, testoutput, callback, timeout=3):
         status = 'Program terminated due to error.'
     except ProgramTimeout as e:
         status = 'Program timed out.'
-    callback(status=status)
-
-
-"""
-Concurrent task queue for `verify`. 
-"""
-class VerifyQueue:
-    queue = mp.JoinableQueue()
-
-    def __init__(self, processes=None):
-        """
-        Specify the number of worker processes to pull from the task queue.
-        Defaults to os.cpu_count()
-        """
-        self.pool = mp.Pool(processes, VerifyQueue._worker_hook, (self.queue,))
-
-    def put(self, language, source, testinput, testoutput, callback, timeout=3):
-        """
-        Put a verify task at the end of the task queue.
-        """
-        self.queue.put((language, source, testinput, testoutput, callback, timeout))
-
-    def join(self):
-        """
-        Block until all tasks on the queue have completed.
-        """
-        self.queue.join()
-
-    @staticmethod
-    def _worker_hook(task_queue):
-        while True:
-            args = task_queue.get(block=True)
-            verify(*args)
-            task_queue.task_done()
-        
-    def __del__(self):
-        self.join()
-        self.pool.close()
+    return status
 

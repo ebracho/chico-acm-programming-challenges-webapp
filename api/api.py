@@ -6,14 +6,14 @@ from functools import partial
 from sqlalchemy import create_engine, Column, Integer, String, LargeBinary, \
     DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session, relationship
 from werkzeug import generate_password_hash, check_password_hash
 from flask import request, abort, jsonify
 
 import api
 
 engine = create_engine('sqlite:///api/riker.db', echo=True)
-DBSession = sessionmaker(engine)
+DBSession = scoped_session(sessionmaker(engine))
 Base = declarative_base()
 
 
@@ -142,6 +142,11 @@ class Problem(Base):
         }
 
 
+
+import verify
+import eventlet
+eventlet.monkey_patch() # Required for eventlet to work with Flask
+
 class Solution(Base):
     __tablename__ = 'solutions'
     id = Column(Integer, primary_key=True)
@@ -151,6 +156,8 @@ class Solution(Base):
     verification = Column(String)
     user_id = Column(String, ForeignKey('users.id'))
     creation_time = Column(DateTime, default=datetime.utcnow)
+
+    problem = relationship('Problem')
 
     def __repr__(self):
         return '<Solution: author={0}>'.format(self.user_id)
@@ -166,7 +173,26 @@ class Solution(Base):
             'verification': self.verification,
         }
 
+    """
+    Verifies the correctness of the solution using `verify.verify`.
+    Task is launched in a separate thread to avoid stalling the server.
+    Verify threads must acquire verify_sem to avoid running too many
+    verification jobs at once.
+    """
+    verify_sem = eventlet.semaphore.Semaphore(4)
+    def verify(self):
+        def verify_async():
+            with Solution.verify_sem:
+                self.verification = verify.verify(
+                    self.language, self.source, self.problem.test_input, 
+                    self.problem.test_output, self.problem.timeout)
+                session = DBSession()
+                session.add(self)
+                session.commit()
 
+        eventlet.spawn_n(verify_async)
+        
+    
 class ProblemComment(Base):
     __tablename__ = 'problem_comments'
     id = Column(Integer, primary_key=True)
@@ -268,8 +294,8 @@ def register():
     return ''
     
 
-@api.blueprint.route('/start-session', methods=['POST'])
-def start_session():
+@api.blueprint.route('/create-session', methods=['POST'])
+def create_session():
     """Generate a 30 day api session key"""
     # Parse request args
     user_id = request.form.get('userId', None)
@@ -328,20 +354,20 @@ def problems():
         return jsonify([problem.to_dict() for problem in problems.all()])
         
     else: # request.method == 'POST'
+        # Validate api session
+        api_session_key = request.headers.get('sessionKey', None)
+        if not ApiSession.validate_session(api_session_key):
+            raise AuthError('Invalid or expired session key.')
+        user_id = ApiSession.get_user_id(api_session_key)
+
         # Parse form arguments
         title = request.form.get('title', None)
         prompt = request.form.get('prompt', None)
         test_input = request.form.get('testInput', '')
         test_output = request.form.get('testOutput', '')
         timeout = request.form.get('timeout', 3)
-        if title is None or prompt is None or api_session_key is None:
+        if title is None or prompt is None: 
             raise RequestError('Missing parameter(s).')
-
-        # Validate api session
-        api_session_key = request.headers.get('sessionKey', None)
-        if not ApiSession.validate_session(api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        user_id = ApiSession.get_user_id(api_session_key)
 
         # Create and write resource
         db_session = DBSession()
@@ -438,6 +464,9 @@ def solutions():
             user_id=user_id, verification='pending')
         db_session.add(solution)
         db_session.commit()
+        
+        # Launch verify thread
+        solution.verify()
 
         return ''
         
