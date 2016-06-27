@@ -10,26 +10,10 @@
 <li><code>password</code>: String</li>
 </ul>
 </li>
-<li>
-<p>response:</p>
-<ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: N/A</li>
+<li>description: 
+    Creates a user account.</li>
 </ul>
-</li>
-<li>failure:<ul>
-<li>code: 400</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>
-<p>description: Creates a user account and begins a session.</p>
-</li>
-</ul>
-<h4>Create Session</h4>
+<h4>CreateSession</h4>
 <ul>
 <li>method: <strong>POST</strong></li>
 <li>endpoint: <em>api.rikerproject.com/create-session</em></li>
@@ -38,144 +22,168 @@
 <li><code>password</code>: String</li>
 </ul>
 </li>
-<li>response:<ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: N/A</li>
+<li>response-body:
+    { 
+        <code>userId</code>:  String,
+        <code>sessionKey</code>: String, 
+        <code>expiration</code>: String
+    }</li>
+<li>description:
+    Create a 30-day api session for <code>userId</code>.
+    All resource submissions/edits/removals require a valid session key.
+    Unauthroized submission/edits/removals will recieve error code <code>401</code> (see <strong>Errors</strong>).</li>
 </ul>
-</li>
-<li>failure (bad request):<ul>
-<li>code: 400</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-<li>failure (bad credentials):<ul>
-<li>code: 401</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-<h4>End Session</h4>
+<h4>EndSession</h4>
 <ul>
 <li>method: <strong>POST</strong></li>
 <li>endpoint: <em>api.rikerproject.com/end-sesson</em></li>
 <li>params:<ul>
-<li><code>userId</code>: String</li>
 <li><code>sessionKey</code>: String</li>
 </ul>
 </li>
-<li>response:<ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: N/A</li>
-</ul>
-</li>
-<li>failure (bad request):<ul>
-<li>code: 400</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-<li>failure (bad credentials):<ul>
-<li>code: 401</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-</ul>
-</li>
+<li>response-body: N/A</li>
+<li>description:
+    Expires <code>sessionKey</code></li>
 </ul>
 <h2>Resource Requests</h2>
 <h4>Problems</h4>
 <ul>
 <li>method: <strong>GET</strong></li>
 <li>endpoint: <em>api.rikerproject.com/problems</em></li>
-<li>params:<ul>
-<li><code>problemID</code>: Int</li>
-<li><code>userId</code>: String</li>
-<li><code>limit</code>: Int</li>
-</ul>
-</li>
-<li>
-<p>response:</p>
-<ul>
-<li>success: <ul>
-<li>code: 200</li>
-<li>content: [ { <code>problemID</code>: Int, <code>userId</code>: String, <code>submissionTime</code>: Int, <code>title</code>: String, <code>prompt</code>: String }, ... ]</li>
-</ul>
-</li>
-<li>failure (bad request)<ul>
-<li>code: 400</li>
-<li>content: { errorMsg: String }</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>
-<p>description: Retrieves a list of problem submissions. Optionally filter by <code>userId</code> or <code>problemID</code> (this will only generate 0 or 1 results). <code>limit</code> specifies maximum result count. Results are sorted by <code>submissionTime</code> (Unix UTC). <code>prompt</code> is in markdown format. </p>
-</li>
+<li>response-body: 
+    [{ 
+        <code>problemID</code>: Int, 
+        <code>userId</code>: String, 
+        <code>submissionTime</code>: Int, 
+        <code>title</code>: String, 
+        <code>prompt</code>: String 
+    }]</li>
+<li>description: 
+    Retrieves problems ordered by <code>submissionTime</code>. </li>
 </ul>
 <h4>Solutions</h4>
 <ul>
 <li>method: <strong>GET</strong></li>
-<li>endpoint: <em>api.rikerproject.com/solutions</em></li>
-<li>params:<ul>
-<li><code>solutionID</code>: Int</li>
-<li><code>problemID</code>: Int</li>
-<li><code>userId</code>: String</li>
-<li><code>language</code>: String</li>
-<li><code>validatedOnly</code>: Boolean</li>
-<li><code>limit</code>: Int</li>
+<li>endpoint: <em>api.rikerproject.com/problems/&lt;problemId&gt;/solutions</em></li>
+<li>params:</li>
+<li>response-body:
+    [{ 
+        <code>solutionID</code>: Int, 
+        <code>userId</code>: Int, 
+        <code>submissionTime</code>: Int, 
+        <code>problemID</code>: Int, 
+        <code>title</code>: String, 
+        <code>language</code>: String, 
+        <code>source</code>: String, 
+        <code>validation</code>: String 
+    }]</li>
+<li>description: 
+    Retrieves solutions for <code>problemId</code> ordered by <code>submissionTime</code>.</li>
 </ul>
-</li>
-<li>
-<p>response:</p>
+<h4>ProblemComments</h4>
 <ul>
-<li>success: <ul>
-<li>code: 200</li>
-<li>content: [ { <code>solutionID</code>: Int, <code>problemID</code>: Int, <code>userId</code>: Int, <code>submissionTime</code>: Int, <code>title</code>: String, <code>language</code>: String, <code>source</code>: String, <code>validation</code>: String }, ... ]</li>
+<li>method <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerpoject.com/problem/&lt;problemId&gt;/comments</em></li>
+<li>response-body:
+    [{
+        <code>problemCommentId</code>: String,
+        <code>userId</code>: String,
+        <code>submissionTime</code>: String,
+        <code>problemId</code>: Int,
+        <code>body</code>: String
+    }]</li>
+<li>description:
+    Retrieves comments for <code>problemId</code>.</li>
 </ul>
-</li>
-<li>failure (bad request)<ul>
-<li>code: 400</li>
-<li>content: { errorMsg: String } </li>
+<h4>SolutionComments</h4>
+<ul>
+<li>method <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerpoject.com/solutions/&lt;solutionId&gt;/comments</em></li>
+<li>response-body:
+    [{
+        <code>solutionCommentId</code>: String,
+        <code>userId</code>: String,
+        <code>submissionTime</code>: String,
+        <code>solutionId</code>: Int,
+        <code>body</code>: String
+    }]</li>
+<li>description:
+    Retrieves comments for <code>solutionId</code>.</li>
 </ul>
-</li>
+<h4>User</h4>
+<ul>
+<li>method <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerproject.com/user/&lt;userId&gt;</em></li>
+<li>response-body:
+    {
+        <code>userId</code>: String,
+        <code>creationTime</code>: String
+    }</li>
+<li>description:
+    Retrieve information about <code>userId</code>.</li>
 </ul>
-</li>
-<li>
-<p>description: Retrieves a list of solutions. Optionally filter by <code>problemID</code>, <code>userId</code>, <code>language</code>, or <code>solutionID</code> (this will only generate 0 or 1 results). <code>validatedOnly</code> specifies whether solution must be validted. <code>limit</code> specifies maximum result count. Results are sorted by <code>submissionTime</code> (Unix UTC).</p>
-</li>
+<h4>UserProblems</h4>
+<ul>
+<li>method <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerproject.com/user/&lt;userId&gt;/problems</em> </li>
+<li>response-body:
+    [{ 
+        <code>problemID</code>: Int, 
+        <code>userId</code>: String, 
+        <code>submissionTime</code>: Int, 
+        <code>title</code>: String, 
+        <code>prompt</code>: String 
+    }]</li>
+<li>description:
+    Retrieves problems submitted by <code>userId</code> ordered by <code>submissionTime</code>.</li>
 </ul>
-<h4>Comments</h4>
+<h4>UserSolutions</h4>
 <ul>
 <li>method: <strong>GET</strong></li>
-<li>endpoint: api.rikerproject.com/comments</li>
-<li>params:<ul>
-<li><code>referenceID</code>: Int</li>
-<li><code>referenceType</code>: String       -- <em>"problem"|"solution"</em></li>
-<li><code>userId</code>: String</li>
-<li><code>limit</code>: Int</li>
+<li>endpoint: <em>api.rikerproject.com/user/&lt;userId&gt;/solutions</em></li>
+<li>response-body:
+    [{
+        <code>solutionID</code>: Int, 
+        <code>userId</code>: Int, 
+        <code>submissionTime</code>: Int, 
+        <code>problemID</code>: Int, 
+        <code>title</code>: String, 
+        <code>language</code>: String, 
+        <code>source</code>: String, 
+        <code>validation</code>: String 
+    }]</li>
+<li>description:
+    Retrieves solutions submitted by <code>userId</code> ordered by <code>submissionTime</code>.</li>
 </ul>
-</li>
-<li>
-<p>response</p>
+<h4>UserProblemComments</h4>
 <ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: [ { <code>userId</code>: String, <code>submissionTime</code>: String, <code>body</code>: String }, ... ]</li>
+<li>method: <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerproject.com/user/&lt;userId&gt;/problem-comments</em></li>
+<li>response-body:
+    [{
+        <code>problemCommentId</code>: String
+        <code>userId</code>: String,
+        <code>submissionTime</code>: String,
+        <code>problemId</code>: Int,
+        <code>body</code>: String
+    }]</li>
+<li>description:
+    Retrieves problem comments for <code>problemId</code> submitted by <code>userId</code> ordered by <code>submissionTime</code>.</li>
 </ul>
-</li>
-<li>failure (bad request)<ul>
-<li>code: 400</li>
-<li>content: { errorMsg: String }</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>
-<p>description: Retrieves comments for the specified submission. Filter results by <code>userId</code> or <code>referenceID</code> (this will only generate 0 or 1 results). <code>referenceID</code> is either a problemID or solutionID depending on the value of <code>referenceType</code>. <code>limit</code> specifies maximum result count.</p>
-</li>
+<h4>UserSolutionComments</h4>
+<ul>
+<li>method <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerproject.com/user/&lt;userId&gt;/solution-comments</em></li>
+<li>response-body:
+    [{
+        <code>solutionCommentId</code>: Int,
+        <code>userId</code>: String,
+        <code>submissionTime</code>: String,
+        <code>solutionId</code>: Int,
+        <code>body</code>: String
+    }]</li>
+<li>description:
+    Retrieves solution comments for <code>solutionId</code> by <code>userId</code> ordered by <code>submissionTime</code>.</li>
 </ul>
 <h2>Resource Submissions</h2>
 <h4>Problems</h4>
@@ -183,103 +191,184 @@
 <li>method: <strong>POST</strong></li>
 <li>endpoint: <em>api.rikerproject.com/problems</em></li>
 <li>params:<ul>
+<li><code>sessionKey</code>: String</li>
 <li><code>title</code>: String</li>
-<li><code>prompt</code>: String      -- <em>Parsed as markdown.</em></li>
+<li><code>prompt</code>: String  </li>
 <li><code>testInput</code>: String</li>
 <li><code>testOutput</code>: String</li>
-<li><code>timeout</code>: Int        -- <em>In seconds. Must be between 1 and 10 seconds.</em></li>
+<li><code>timeout</code>: Int        </li>
 </ul>
 </li>
-<li>
-<p>response:</p>
-<ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: N/A</li>
-</ul>
-</li>
-<li>failure (not logged in):<ul>
-<li>code: 401</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-<li>failure (bad submission): <ul>
-<li>code: 400</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>
-<p>description: Submits a problem. <strong>This method requires an active session</strong>. </p>
-</li>
+<li>response-body: N/A</li>
+<li>description: 
+    Submits a problem. <code>timeout</code> is in seconds.</li>
 </ul>
 <h4>Solutions</h4>
 <ul>
 <li>method: <strong>POST</strong></li>
 <li>endpoint: <em>api.rikerproject.com/solutions</em></li>
 <li>params:<ul>
+<li><code>sessionKey</code>: String</li>
 <li><code>problemID</code>: Int</li>
 <li><code>title</code>: String</li>
 <li><code>language</code>: String</li>
 <li><code>source</code>: String</li>
 </ul>
 </li>
-<li>
-<p>response:</p>
-<ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: N/A</li>
+<li>response-body: N/A</li>
+<li>description: 
+    Submits a solution to problem with id <code>problemID</code>.</li>
 </ul>
-</li>
-<li>failure (not logged in):<ul>
-<li>code: 401</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-<li>failure (bad submission): <ul>
-<li>code: 400</li>
-<li>content: { <code>errorMsg</code>: String }</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>
-<p>description: Submits a solution to problem with id <code>problemID</code>. <strong>This method requires an active session</strong>. </p>
-</li>
-</ul>
-<h4>Comments</h4>
+<h4>ProblemComment</h4>
 <ul>
 <li>method: <strong>POST</strong></li>
-<li>endpoint: <em>api.rikerproject.com/comments</em></li>
+<li>endpoint: <em>api.rikerproject.com/problems/&lt;problemId&gt;/comments</em></li>
 <li>params:<ul>
-<li><code>referenceID</code>: Int</li>
-<li><code>referenceType</code>: String       -- <em>"problem"|"solution"</em></li>
+<li><code>sessionKey</code>: String</li>
+<li><code>body</code>: String
+response-body:
+{
+    problemCommentId: Int
+}
+description:
+Submits a comment for <code>problemId</code>.</li>
+</ul>
+</li>
+</ul>
+<h4>SolutionComment</h4>
+<ul>
+<li>method: <strong>POST</strong></li>
+<li>endpoint: <em>api.rikerproject.com/solutions/&lt;solutionId&gt;/comments</em></li>
+<li>params:<ul>
+<li><code>sessionKey</code>: String</li>
+<li><code>body</code>: String
+response-body:
+{
+    problemCommentId: Int
+}
+description:
+Submits a comment for <code>problemId</code>. </li>
+</ul>
+</li>
+</ul>
+<h2>Resource Editing</h2>
+<h4>EditProblem</h4>
+<ul>
+<li>method: <strong>POST</strong></li>
+<li>endpoint: <em>api.rikerproject.com/problems/&lt;problemId&gt;/edit</em></li>
+<li>params:<ul>
+<li><code>sessionKey</code>: String</li>
+<li><code>title</code>: String</li>
+<li><code>prompt</code>: String  </li>
+<li><code>testInput</code>: String</li>
+<li><code>testOutput</code>: String</li>
+<li><code>timeout</code>: Int        </li>
+</ul>
+</li>
+<li>response-body: N/A</li>
+<li>description:
+    Updates the fields of <code>problemId</code>.</li>
+</ul>
+<h4>EditSolution</h4>
+<ul>
+<li>method: <strong>POST</strong></li>
+<li>endpoint: <em>api.rikerproject.com/solutions/&lt;solution_id&gt;/edit</em></li>
+<li>params:<ul>
+<li><code>sessionKey</code>: String</li>
+<li><code>problemID</code>: Int</li>
+<li><code>title</code>: String</li>
+<li><code>language</code>: String</li>
+<li><code>source</code>: String</li>
+</ul>
+</li>
+<li>response-body: N/A
+description:
+    Updates the fields of <code>solutionId</code>.</li>
+</ul>
+<h4>EditProblemComment</h4>
+<ul>
+<li>method: <em>POST</em></li>
+<li>endpoint: <em>api.rikerproject.com/problem-comments/&lt;problemCommentId&gt;/edit</em></li>
+<li>params:<ul>
+<li><code>sessionId</code>: String</li>
 <li><code>body</code>: String</li>
 </ul>
 </li>
-<li>
-<p>response:</p>
+<li>response-body: N/A
+description:
+    Updates contents of <code>problemCommentId</code>.</li>
+</ul>
+<h4>EditSolutionComment</h4>
 <ul>
-<li>success:<ul>
-<li>code: 200</li>
-<li>content: N/A</li>
+<li>method: <em>POST</em></li>
+<li>endpoint: <em>api.rikerproject.com/solution-comments/&lt;solutionCommentId&gt;/edit</em></li>
+<li>params:<ul>
+<li><code>sessionId</code>: String</li>
+<li><code>body</code>: String</li>
 </ul>
 </li>
-<li>failure (not logged in):<ul>
-<li>code: 401</li>
-<li>content: { <code>errorMsg</code>: String }</li>
+<li>response-body: N/A
+description:
+    Updates contents of <code>problemCommentId</code>.</li>
+</ul>
+<h2>Resource Removal</h2>
+<h4>RemoveProblem</h4>
+<ul>
+<li>method: <em>DELETE</em></li>
+<li>endpoint: <em>api.rikerproject.com/problems/&lt;problemId&gt;</em></li>
+<li>params:<ul>
+<li><code>sessionKey</code>: String</li>
 </ul>
 </li>
-<li>failure (bad submission):<ul>
-<li>code: 400</li>
-<li>content: { <code>errorMsg</code>: String }</li>
+<li>response-body: N/A</li>
+<li>description:
+    Removes <code>problemId</code> and all associated solutions/comments.</li>
+</ul>
+<h4>RemoveSolution</h4>
+<ul>
+<li>method: <em>DELETE</em></li>
+<li>endpoint: <em>api.rikerproject.com/solutions/&lt;solutionId&gt;</em></li>
+<li>params:<ul>
+<li><code>sessionKey</code>: String</li>
 </ul>
 </li>
+<li>response-body: N/A</li>
+<li>description:
+    Removes <code>solutionId</code> and all associated comments.</li>
+</ul>
+<h4>RemoveProblemComment</h4>
+<ul>
+<li>method: <em>DELETE</em></li>
+<li>endpoint: <em>api.rikerproject.com/problem-comments/&lt;problemCommentId&gt;</em></li>
+<li>params:<ul>
+<li><code>sessionKey</code>: String</li>
 </ul>
 </li>
-<li>
-<p>description: Submits a comment to the problem or solution (depending on <code>referenceType</code>) with id <code>referenceID</code>. <strong>This method requires an active session</strong></p>
+<li>response-body: N/A</li>
+<li>description:
+    Removes <code>problemCommentId</code>.</li>
+</ul>
+<h4>RemoveSolutionComment</h4>
+<ul>
+<li>method: <em>DELETE</em></li>
+<li>endpoint: <em>api.rikerproject.com/solution-comments/&lt;solutionCommentId&gt;</em></li>
+<li>params:<ul>
+<li><code>sessionKey</code>: String</li>
+</ul>
 </li>
+<li>response-body: N/A</li>
+<li>description:
+    Removes <code>solutionCommentId</code>. </li>
+</ul>
+<h2>Errors</h2>
+<ul>
+<li>response-codes:<ul>
+<li><code>400</code>: Malformed or invalid request</li>
+<li><code>401</code>: Authentication error (invalid credientials or session key)</li>
+</ul>
+</li>
+<li>response-body:
+    {
+        <code>errorMsg</code>: String
+    }</li>
 </ul>

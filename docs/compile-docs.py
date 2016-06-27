@@ -1,6 +1,6 @@
 #!/usr/bin/env python3.5
-import Markdown
+import markdown
 
 # api doc
-Markdown.MarkdownFromFile('docs/api.md', 'api/api.html')
+markdown.markdownFromFile('docs/api.md', 'api/api.html', safe_mode='escape')
 

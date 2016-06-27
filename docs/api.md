@@ -10,7 +10,7 @@
 	- `userId`: String
 	- `password`: String
 - description: 
-	Creates a user account and begins a session.
+	Creates a user account.
 
 #### CreateSession
 - method: **POST**
@@ -26,7 +26,8 @@
 	}
 - description:
 	Create a 30-day api session for `userId`.
-	
+	All resource submissions/edits/removals require a valid session key.
+	Unauthroized submission/edits/removals will recieve error code `401` (see **Errors**).
 		
 #### EndSession
 - method: **POST**
@@ -54,7 +55,7 @@
 - description: 
 	Retrieves problems ordered by `submissionTime`. 
 
-#### ProblemSolutions
+#### Solutions
 - method: **GET**
 - endpoint: *api.rikerproject.com/problems/<problemId>/solutions*
 - params:
@@ -77,6 +78,7 @@
 - endpoint: *api.rikerpoject.com/problem/<problemId>/comments*
 - response-body:
 	[{
+		`problemCommentId`: String,
 		`userId`: String,
 		`submissionTime`: String,
 		`problemId`: Int,
@@ -90,6 +92,7 @@
 - endpoint: *api.rikerpoject.com/solutions/<solutionId>/comments*
 - response-body:
 	[{
+		`solutionCommentId`: String,
 		`userId`: String,
 		`submissionTime`: String,
 		`solutionId`: Int,
@@ -145,6 +148,7 @@
 - endpoint: *api.rikerproject.com/user/<userId>/problem-comments*
 - response-body:
 	[{
+		`problemCommentId`: String
 		`userId`: String,
 		`submissionTime`: String,
 		`problemId`: Int,
@@ -158,6 +162,7 @@
 - endpoint: *api.rikerproject.com/user/<userId>/solution-comments*
 - response-body:
 	[{
+		`solutionCommentId`: Int,
 		`userId`: String,
 		`submissionTime`: String,
 		`solutionId`: Int,
@@ -169,26 +174,25 @@
 
 ## Resource Submissions
 
-- All resource submissions require a valid session key (see **CreateSession**).
-- Unauthroized submissions will recieve error code `401` (see **Errors**).
-
 #### Problems
 - method: **POST**
 - endpoint: *api.rikerproject.com/problems*
 - params:
+	- `sessionKey`: String
 	- `title`: String
-	- `prompt`: String		-- *Parsed as markdown.*
+	- `prompt`: String	
 	- `testInput`: String
 	- `testOutput`: String
-	- `timeout`: Int		-- *In seconds. Must be between 1 and 10 seconds.*
+	- `timeout`: Int		
 - response-body: N/A
 - description: 
-	Submits a problem. 
+	Submits a problem. `timeout` is in seconds.
 
 #### Solutions
 - method: **POST**
 - endpoint: *api.rikerproject.com/solutions*
 - params:
+	- `sessionKey`: String
 	- `problemID`: Int
 	- `title`: String
 	- `language`: String
@@ -201,7 +205,7 @@
 - method: **POST**
 - endpoint: *api.rikerproject.com/problems/<problemId>/comments*
 - params:
-	- `sessionKey`: Int
+	- `sessionKey`: String
 	- `body`: String
 response-body:
 	{
@@ -214,7 +218,7 @@ description:
 - method: **POST**
 - endpoint: *api.rikerproject.com/solutions/<solutionId>/comments*
 - params:
-	- `sessionKey`: Int
+	- `sessionKey`: String
 	- `body`: String
 response-body:
 	{
@@ -223,11 +227,99 @@ response-body:
 description:
 	Submits a comment for `problemId`. 
 
+## Resource Editing
+
+#### EditProblem
+- method: **POST**
+- endpoint: *api.rikerproject.com/problems/<problemId>/edit*
+- params:
+	- `sessionKey`: String
+	- `title`: String
+	- `prompt`: String	
+	- `testInput`: String
+	- `testOutput`: String
+	- `timeout`: Int		
+- response-body: N/A
+- description:
+	Updates the fields of `problemId`.
+
+#### EditSolution
+- method: **POST**
+- endpoint: *api.rikerproject.com/solutions/<solution_id>/edit*
+- params:
+	- `sessionKey`: String
+	- `problemID`: Int
+	- `title`: String
+	- `language`: String
+	- `source`: String
+- response-body: N/A
+description:
+	Updates the fields of `solutionId`.
+
+#### EditProblemComment
+- method: *POST*
+- endpoint: *api.rikerproject.com/problem-comments/<problemCommentId>/edit*
+- params:
+	- `sessionId`: String
+	- `body`: String
+- response-body: N/A
+description:
+	Updates contents of `problemCommentId`.
+	
+#### EditSolutionComment
+- method: *POST*
+- endpoint: *api.rikerproject.com/solution-comments/<solutionCommentId>/edit*
+- params:
+	- `sessionId`: String
+	- `body`: String
+- response-body: N/A
+description:
+	Updates contents of `problemCommentId`.
+	
+
+## Resource Removal
+
+#### RemoveProblem
+- method: *DELETE*
+- endpoint: *api.rikerproject.com/problems/<problemId>*
+- params:
+	- `sessionKey`: String
+- response-body: N/A
+- description:
+	Removes `problemId` and all associated solutions/comments.
+
+#### RemoveSolution
+- method: *DELETE*
+- endpoint: *api.rikerproject.com/solutions/<solutionId>*
+- params:
+	- `sessionKey`: String
+- response-body: N/A
+- description:
+	Removes `solutionId` and all associated comments.
+
+#### RemoveProblemComment
+- method: *DELETE*
+- endpoint: *api.rikerproject.com/problem-comments/<problemCommentId>*
+- params:
+	- `sessionKey`: String
+- response-body: N/A
+- description:
+	Removes `problemCommentId`.
+
+#### RemoveSolutionComment
+- method: *DELETE*
+- endpoint: *api.rikerproject.com/solution-comments/<solutionCommentId>*
+- params:
+	- `sessionKey`: String
+- response-body: N/A
+- description:
+	Removes `solutionCommentId`. 
+
 
 ## Errors
 - response-codes:
-	`400`: Malformed or invalid request
-	`401`: Authentication Error (invalid credientials or session key)
+	- `400`: Malformed or invalid request
+	- `401`: Authentication error (invalid credientials or session key)
 - response-body:
 	{
 		`errorMsg`: String
