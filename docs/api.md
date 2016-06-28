@@ -36,7 +36,7 @@
 	- `sessionKey`: String
 - response-body: N/A
 - description:
-	Expires `sessionKey`
+	Expires `sessionKey`.
 	
 
 ## Resource Requests
@@ -46,7 +46,7 @@
 - endpoint: *api.rikerproject.com/problems*
 - response-body: 
 	[{ 
-		`problemID`: Int, 
+		`problemId`: Int, 
 		`userId`: String, 
 		`submissionTime`: Int, 
 		`title`: String, 
@@ -55,17 +55,29 @@
 - description: 
 	Retrieves problems ordered by `submissionTime`. 
 
+#### ProblemById
+- method: **GET**
+- endpoint: *api.rikerproject.com/problems/<problem_id>*
+- response-body: 
+	{ 
+		`problemId`: Int, 
+		`userId`: String, 
+		`submissionTime`: Int, 
+		`title`: String, 
+		`prompt`: String 
+	}
+- description:
+	Retrieves `problemId`. 
+
 #### Solutions
 - method: **GET**
 - endpoint: *api.rikerproject.com/problems/<problemId>/solutions*
-- params:
 - response-body:
 	[{ 
-		`solutionID`: Int, 
+		`solutionId`: Int, 
 		`userId`: Int, 
 		`submissionTime`: Int, 
-		`problemID`: Int, 
-		`title`: String, 
+		`problemId`: Int, 
 		`language`: String, 
 		`source`: String, 
 		`validation`: String 
@@ -73,9 +85,25 @@
 - description: 
 	Retrieves solutions for `problemId` ordered by `submissionTime`.
 
+#### SolutionById
+- method: **GET**
+- endpoint: *api.rikerproject.com/solutions/<solutionId>*
+- response-body:
+	{ 
+		`solutionId`: Int, 
+		`userId`: Int, 
+		`submissionTime`: Int, 
+		`problemId`: Int, 
+		`language`: String, 
+		`source`: String, 
+		`validation`: String 
+	}
+description:
+	Retrieves `solutionId`. 
+
 #### ProblemComments
 - method **GET**
-- endpoint: *api.rikerpoject.com/problem/<problemId>/comments*
+- endpoint: *api.rikerpoject.com/problems/<problemId>/comments*
 - response-body:
 	[{
 		`problemCommentId`: String,
@@ -86,6 +114,20 @@
 	}]
 - description:
 	Retrieves comments for `problemId`.
+
+#### ProblemCommentsById
+- method: **GET**
+- endpoint: *api.rikerproject.com/problems/comments/<problemCommentId>*
+- response-body:
+	{
+		`problemCommentId`: String,
+		`userId`: String,
+		`submissionTime`: String,
+		`problemId`: Int,
+		`body`: String
+	}
+- description:
+	Retrieves `problemCommentId`.
 
 #### SolutionComments
 - method **GET**
@@ -100,6 +142,20 @@
 	}]
 - description:
 	Retrieves comments for `solutionId`.
+
+#### SolutionCommentsById
+- mehtod: **GET**
+- endpoint: *api.rikerproject.com/solutions/comments/<solutionCommentId>*
+- response-body:
+	{
+		`solutionCommentId`: String,
+		`userId`: String,
+		`submissionTime`: String,
+		`solutionId`: Int,
+		`body`: String
+	}
+- description:
+	Retrieves `solutionCommentId`.
 
 #### User
 - method **GET**
@@ -117,7 +173,7 @@
 - endpoint: *api.rikerproject.com/user/<userId>/problems* 
 - response-body:
 	[{ 
-		`problemID`: Int, 
+		`problemId`: Int, 
 		`userId`: String, 
 		`submissionTime`: Int, 
 		`title`: String, 
@@ -131,11 +187,10 @@
 - endpoint: *api.rikerproject.com/user/<userId>/solutions*
 - response-body:
 	[{
-		`solutionID`: Int, 
+		`solutionId`: Int, 
 		`userId`: Int, 
 		`submissionTime`: Int, 
-		`problemID`: Int, 
-		`title`: String, 
+		`problemId`: Int, 
 		`language`: String, 
 		`source`: String, 
 		`validation`: String 
@@ -193,13 +248,12 @@
 - endpoint: *api.rikerproject.com/solutions*
 - params:
 	- `sessionKey`: String
-	- `problemID`: Int
-	- `title`: String
+	- `problemId`: Int
 	- `language`: String
 	- `source`: String
 - response-body: N/A
 - description: 
-	Submits a solution to problem with id `problemID`.
+	Submits a solution to problem with id `problemId`.
 
 #### ProblemComment
 - method: **POST**
@@ -227,6 +281,7 @@ response-body:
 description:
 	Submits a comment for `problemId`. 
 
+
 ## Resource Editing
 
 #### EditProblem
@@ -248,8 +303,7 @@ description:
 - endpoint: *api.rikerproject.com/solutions/<solution_id>/edit*
 - params:
 	- `sessionKey`: String
-	- `problemID`: Int
-	- `title`: String
+	- `problemId`: Int
 	- `language`: String
 	- `source`: String
 - response-body: N/A
@@ -258,7 +312,7 @@ description:
 
 #### EditProblemComment
 - method: *POST*
-- endpoint: *api.rikerproject.com/problem-comments/<problemCommentId>/edit*
+- endpoint: *api.rikerproject.com/problems/comments/<problemCommentId>/edit*
 - params:
 	- `sessionId`: String
 	- `body`: String
@@ -268,7 +322,7 @@ description:
 	
 #### EditSolutionComment
 - method: *POST*
-- endpoint: *api.rikerproject.com/solution-comments/<solutionCommentId>/edit*
+- endpoint: *api.rikerproject.com/solutions/comments/<solutionCommentId>/edit*
 - params:
 	- `sessionId`: String
 	- `body`: String
@@ -299,7 +353,7 @@ description:
 
 #### RemoveProblemComment
 - method: *DELETE*
-- endpoint: *api.rikerproject.com/problem-comments/<problemCommentId>*
+- endpoint: *api.rikerproject.com/problems/comments/<problemCommentId>*
 - params:
 	- `sessionKey`: String
 - response-body: N/A
@@ -308,7 +362,7 @@ description:
 
 #### RemoveSolutionComment
 - method: *DELETE*
-- endpoint: *api.rikerproject.com/solution-comments/<solutionCommentId>*
+- endpoint: *api.rikerproject.com/solutions/comments/<solutionCommentId>*
 - params:
 	- `sessionKey`: String
 - response-body: N/A
@@ -318,8 +372,9 @@ description:
 
 ## Errors
 - response-codes:
-	- `400`: Malformed or invalid request
-	- `401`: Authentication error (invalid credientials or session key)
+	- `400`: Malformed or invalid request.
+	- `401`: Authentication error (invalid credientials or session key).
+	- `404`: Resource not found.
 - response-body:
 	{
 		`errorMsg`: String

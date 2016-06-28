@@ -1,9 +1,28 @@
 import json
-from flask import request, abort, jsonify
+from flask import request, g, abort, jsonify
 
 import api
-from api.models import DBSession, User, ApiSession, Problem, Solution, \
-ProblemComment, SolutionComment
+from api.models import (DBSession, User, ApiSession, Problem, Solution, 
+    ProblemComment, SolutionComment)
+
+# Application context functions
+
+def get_db_session():
+    """Opens a new databse session if there is not one already for the current
+    application context."""
+    if not hasattr(g, 'db_session'):
+        g.db_session = DBSession()
+    return g.db_session
+
+def close_db_session():
+    if hasattr(g, 'db_session'):
+        g.db_session.commit()
+        g.db_session.close()
+
+@api.blueprint.after_request
+def after_request(response):
+    close_db_session()
+    return response
 
 
 # Route exceptions and error handlers
@@ -40,95 +59,113 @@ def doc():
 
 @api.blueprint.route('/register', methods=['POST'])
 def register():
-    """Create user or return error message"""
+    """Create new user"""
+    # Parse request parameters
     user_id = request.form['userId']
     password = request.form['password']
     if not (user_id and password):
         raise RequestError('Missing parameter(s).')
 
-    if User.by_id(user_id):
+    # Validate parameters
+    if User.exists(user_id):
         raise RequestError('User {0} already exists.'.format(user_id))
     if not 3 <= len(user_id) <= 15:
-        raise RequestError('Invalid user id length.')
+        raise RequestError('User id must be between 3 and 15 chars.')
     if not 7 <= len(password) <= 128:
-        raise RequestError('Invalid password length.')
+        raise RequestError('Password must be between 7 and 128 chars.')
 
-    db_session = DBSession()
+    # Create new user
+    db_session = get_db_session()
     new_user = User(user_id, password)
     db_session.add(new_user)
-    db_session.commit()
+
     return ''
     
 
 @api.blueprint.route('/create-session', methods=['POST'])
 def create_session():
     """Generate a 30 day api session key"""
-    # Parse request args
+    # Parse request parameters
     user_id = request.form.get('userId', None)
     password = request.form.get('password', None)
-    if not (user_id and password):
+    if user_id is None or password is None:
         raise RequestError('Missing parameter(s).')
 
+    db_session = get_db_session()
+
     # Validate user credentials
-    if not User.auth_user(user_id, password):
+    user = db_session.query(User).filter(User.id==user_id).first()
+    if user is None:
+        raise AuthError('Incorrect userId/password.')
+    elif not user.auth(password):
         raise AuthError('Incorrect userId/password.')
 
     # Create api session key
-    db_session = DBSession()
     api_session = ApiSession(user_id=user_id)
     db_session.add(api_session)
-    db_session.commit()
+    db_session.commit() # Apply default column values to api_session
 
-    # Return serialized data
-    return jsonify({
+    # Seriealize and return data.
+    res = {
         'userId': api_session.user_id,
         'sessionKey': api_session.get_key(),
         'expiration': api_session.expiration
-    })
+    }
+    return jsonify(res)
     
 
 @api.blueprint.route('/end-session', methods=['POST'])
 def end_session():
     """Ends the specified session"""
-    # Parse request args
-    api_session_key = request.headers.get('sessionKey', None)
+    # Parse request parameters
+    api_session_key = request.form.get('sessionKey', None)
     if api_session_key is None:
         raise RequestError('Missing parameter(s).')
 
+    db_session = get_db_session()
+
     # Validate api session
-    if not ApiSession.validate_session(api_session_key):
+    if not ApiSession.validate_session(db_session, api_session_key):
         raise AuthError('Session does not exist.')
 
-    ApiSession.end_session(api_session_key)
-
+    ApiSession.end_session(db_session, api_session_key)
     return ''
     
 
 @api.blueprint.route('/problems', methods=['GET','POST'])
 def problems():
     """Retrieve or create problem(s)"""
+    db_session = get_db_session()
+
     if request.method == 'GET':
         # Parse query-string arguments
         user_id = request.args.get('userId', None)
         limit = request.args.get('limit', None)
 
         # Build select query
-        db_session = DBSession()
         problems = db_session.query(Problem)
         if user_id is not None:
             problems = problems.filter(Problem.user_id == user_id)
         if limit is not None:
             problems = problems.limit(limit)
 
-        # Serialize and return resource(s)
-        return jsonify([problem.to_dict() for problem in problems.all()])
+        # Serialize and return response body
+        res = [{
+            'problemId': problem.id,
+            'userId': problem.user_id,
+            'submissionTime': problem.submission_time,
+            'title': problem.title,
+            'prompt': problem.prompt
+        } for problem in problems.all() ]
+
+        return jsonify(res)
         
     else: # request.method == 'POST'
         # Validate api session
-        api_session_key = request.headers.get('sessionKey', None)
-        if not ApiSession.validate_session(api_session_key):
+        api_session_key = request.form.get('sessionKey', '')
+        if not ApiSession.validate_session(db_session, api_session_key):
             raise AuthError('Invalid or expired session key.')
-        user_id = ApiSession.get_user_id(api_session_key)
+        user_id = ApiSession.get_user_id(db_session, api_session_key)
 
         # Parse form arguments
         title = request.form.get('title', None)
@@ -140,19 +177,19 @@ def problems():
             raise RequestError('Missing parameter(s).')
 
         # Create and write resource
-        db_session = DBSession()
         problem = Problem(
             title=title, prompt=prompt, test_input=test_input, 
             test_output=test_output, timeout=timeout, user_id=user_id)
         db_session.add(problem)
-        db_session.commit()
 
         return ''
 
 
-@api.blueprint.route('/problems/<problem_id>', methods=['GET','DELETE'])
+@api.blueprint.route('/problems/<problem_id>', methods=['GET', 'DELETE'])
 def problem_by_id(problem_id):
-    db_session = DBSession()
+    db_session = get_db_session()
+
+    # Parse and validate problem id
     problem = db_session.query(Problem).filter(
         Problem.id == problem_id).first()
     if problem is None:
@@ -162,23 +199,26 @@ def problem_by_id(problem_id):
         return jsonify(problem.to_dict())
 
     else: # request.method == 'DELETE'
-        api_session_key = request.headers.get('sessionKey', None)
+        # Parse api session key
+        api_session_key = request.form.get('sessionKey', None)
         if api_session_key is None:
             raise RequestError('Missing parameter(s).')
-        if not ApiSession.validate_session(api_session_key):
-            raise AuthError('Invalid or expired session key.')
 
-        if ApiSession.get_user_id(api_session_key) != problem.user_id:
-            raise AuthError('Resource not owned by user.')
+        # Validate api session key
+        if not ApiSession.validate_session(db_session, api_session_key):
+            raise AuthError('Invalid or expired session key.')
+        if ApiSession.get_user_id(db_session, api_session_key) != problem.user_id:
+            raise AuthError('Resource not owned by user {}.'.format(problem.user_id))
 
         db_session.delete(problem)
-        db_session.commit()
 
         return ''
 
 
 @api.blueprint.route('/solutions', methods=['GET','POST'])
 def solutions():
+    db_session = get_db_session()
+
     if request.method == 'GET':
         # Parse request args
         problem_id = request.args.get('problemId', None)
@@ -188,7 +228,6 @@ def solutions():
         limit = request.args.get('limit', None)
 
         # Build select query
-        db_session = DBSession()
         solutions = db_session.query(Solution)
         if problem_id:
             solutions = solutions.filter(Solution.problem_id == problem_id)
@@ -201,9 +240,17 @@ def solutions():
         if limit:
             solutions = solutions.limit(limit)
         
-        # Execute query and serialize data
-        response_body = jsonify([s.to_dict() for s in solutions.all()])
-        return response_body
+        # Serialize and return data
+        res = [{
+            'solutionId': solution.id,
+            'userId': solution.user_id,
+            'submissionTime': solusion.submission_time,
+            'problemId': solution.problem_id,
+            'language': solution.language,
+            'source': solution.source,
+            'validation': solution.validation
+        } for solution in solutions.all() ]
+        return jsonify(res)
 
     else: # request.method == 'POST'
         # Parse request args
@@ -214,15 +261,14 @@ def solutions():
             raise RequestError('Missing parameter(s)')
 
         # Validate api session
-        api_session_key = request.headers.get('sessionKey', None)
+        api_session_key = request.form.get('sessionKey', None)
         if api_session_key is None:
             raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(api_session_key):
+        if not ApiSession.validate_session(db_session, api_session_key):
             raise AuthError('Invalid or expired session key.')
-        user_id = ApiSession.get_user_id(api_session_key)
+        user_id = ApiSession.get_user_id(db_session, api_session_key)
         
         # Check whether problem exists
-        db_session = DBSession()
         problem = db_session.query(Problem).filter(
             Problem.id == problem_id).first()
         if problem is None:
@@ -233,9 +279,8 @@ def solutions():
             problem_id=problem_id, language=language, source=source, 
             user_id=user_id, verification='pending')
         db_session.add(solution)
-        db_session.commit()
         
-        # Launch verify thread
+        # Spawn verify thread
         solution.verify()
 
         return ''
@@ -243,7 +288,9 @@ def solutions():
         
 @api.blueprint.route('/solutions/<solution_id>', methods=['GET','DELETE'])
 def solution_by_id(solution_id):
-    db_session = DBSession()
+    db_session = get_db_sesion()
+
+    # Confirm that solution exists
     solution = db_session.query(Solution).filter(Solution.id == solution_id)
     if solution is None:
         abort(404)
@@ -252,129 +299,167 @@ def solution_by_id(solution_id):
         return jsonify(solution.to_dict())
     
     else: # request.method == 'DELETE'
-        api_session_key = request.headers.get('sessionKey', None)
-
+        # Validate api session key
+        api_session_key = request.form.get('sessionKey', None)
         if api_session_key is None:
             raise RequestError('No session key provided.')
-        if not ApiSession.validate_session(api_session_key):
+        if not ApiSession.validate_session(db_session, api_session_key):
             raise AuthError('Invalid or expired session key.')
-        if ApiSession.get_user_id(api_session_key) != solution.user_id:
+        if ApiSession.get_user_id(db_session, api_session_key) != solution.user_id:
             raise AuthError('Resource not owned by user.')
 
         session.delete(solution)
-        session.commit()
-
         return ''
 
 
 @api.blueprint.route('/problems/<problem_id>/comments', methods=['GET','POST'])
 def problem_comments(problem_id):
-    db_session = DBSession()
+    db_session = get_db_session()
 
     if request.method == 'GET':
+        # Create query
         comments = db_session.query(ProblemComment).filter(
-            ProblemComment.id == problem_id).all()
+            ProblemComment.id == problem_id)
 
-        response_body = jsonify([c.to_dict() for c in comments])
-        return response_body
+        # Serialize and return response body
+        res = [{
+            'problemCommentId': comment.id,
+            'userId': comment.user_id,
+            'submissionTime': comment.submission_time,
+            'problemId': comment.problem_id,
+            'body': comment.body
+        } for comment in comments.all() ]
+        return jsonify(res)
 
     else: # request.method == 'POST'
-
-        api_session_key = request.headers.get('sessionKey', None)
+        # Validate api session key
+        api_session_key = request.form.get('sessionKey', None)
         if api_session_key is None:
             raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(api_session_key):
+        if not ApiSession.validate_session(db_session, api_session_key):
             raise AuthError('Invalid or expired session key.')
         
-        user_id = ApiSession.get_user_id(api_session_key)
+        # Create comment
+        user_id = ApiSession.get_user_id(db_session, api_session_key)
         comment = ProblemComment(
             problem_id=problem_id, user_id=user_id, body=body)
-
         db_session.add(comment)
-        db_session.commit()
 
-        return jsonify(comment.to_dict())
+        # Serialize and return response body
+        return jsonify({
+            'problemCommentid': comment.id,
+            'userId': comment.user_id,
+            'submissionTime': comment.submission_time,
+            'problemId': comment.problem_id,
+            'body': comment.body
+        })
 
 
 @api.blueprint.route('/problems/comments/<comment_id>', methods=['GET','DELETE'])
 def problem_comments_by_id(comment_id):
-    db_session = DBSession()
+    db_session = get_db_session()
+
     comment = db_session.query(ProblemComment).filter(
         ProblemComment.id == comment_id).first()
-        
-    if problem_comment is None:
+    if comment is None:
         abort(404)
 
     if request.method == 'GET':
-        return jsonify(problem_comment.to_dict())
-    
+        return jsonify({
+            'problemCommentid': comment.id,
+            'userId': comment.user_id,
+            'submissionTime': comment.submission_time,
+            'problemId': comment.problem_id,
+            'body': comment.body
+        })
+
     else: # request.method == 'DELETE'
-        api_session_key = request.headers.get('sessionKey', None)
+        # Validate api session key
+        api_session_key = request.form.get('sessionKey', None)
         if api_session_key is None:
             raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(api_session_key):
+        if not ApiSession.validate_session(db_session, api_session_key):
             raise AuthError('Invalid or expired session key.')
-        if ApiSession.get_user_id(api_session_key) != comment.user_id:
+        if ApiSession.get_user_id(db_session, api_session_key) != comment.user_id:
             raise AuthError('Resource not owned by user.')
     
         session.delete(comment)
-        session.commit()
     
         return ''
 
 
 @api.blueprint.route('/solution/<solution_id>/comments', methods=['GET','POST'])
 def solution_comments(solution_id):
-    db_session = DBSession()
+    db_session = get_db_session()
 
     if request.method == 'GET':
         comments = db_session.query(SolutionComment).filter(
             SolutionComment.id == solution_id)
 
-        response_body = jsonify([c.to_dict() for c in comments.all()])
-        return response_body
+        # Serialize and return data
+        res = [{
+            'solutionCommentId': comment.id,
+            'userId': comment.user_id,
+            'submissionTime': comment.submission_time,
+            'solutionId': comment.solution_id,
+            'body': comment.body
+        } for comment in comments.all() ]
+        return jsonify(res)
 
     else: # request.method == 'POST'
-
-        api_session_key = request.headers.get('sessionKey', None)
+        # Validate api session key
+        api_session_key = request.form.get('sessionKey', None)
         if api_session_key is None:
             raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(api_session_key):
+        if not ApiSession.validate_session(db_session, api_session_key):
             raise AuthError('Invalid or expired session key.')
         
-        user_id = ApiSession.get_user_id(api_session_key)
+        # Create comment
+        user_id = ApiSession.get_user_id(db_session, api_session_key)
         comment = SolutionComment(
             solution_id=solution_id, user_id=user_id, body=body)
-
         db_session.add(comment)
-        db_session.commit()
 
-        return jsonify(comment.to_dict())
+        # Serialize and return response body
+        return jsonify({
+            'solutionCommentId': comment.id,
+            'userId': comment.user_id,
+            'submissionTime': comment.submission_time,
+            'solutionId': comment.solution_id,
+            'body': comment.body
+        })
 
 
 @api.blueprint.route('/solutions/comments/<comment_id>', methods=['GET','DELETE'])
 def solution_comments_by_id(comment_id):
-    db_session = DBSession()
+    db_session = get_db_session()
+
     comment = db_session.query(SolutionComment).filter(
         SolutionComment.id == comment_id).first()
-        
     if problem_comment is None:
         abort(404)
 
     if request.method == 'GET':
-        return jsonify(comment.to_dict())
+        # Serialize and return response body
+        return jsonify({
+            'solutionCommentId': comment.id,
+            'userId': comment.user_id,
+            'submissionTime': comment.submission_time,
+            'solutionId': comment.solution_id,
+            'body': comment.body
+        })
     
     else: # request.method == 'DELETE'
-        api_session_key = request.headers.get('sessionKey', None)
+        # Validate api session key
+        api_session_key = request.form.get('sessionKey', None)
         if api_session_key is None:
             raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(api_session_key):
+        if not ApiSession.validate_session(db_session, api_session_key):
             raise AuthError('Invalid or expired session key.')
-        if ApiSession.get_user_id(api_session_key) != problem_comment.user_id:
+        if ApiSession.get_user_id(db_session, api_session_key) != problem_comment.user_id:
             raise AuthError('Resource not owned by user.')
     
         session.delete(comment)
-        session.commit()
     
         return ''
 

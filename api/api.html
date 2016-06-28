@@ -61,11 +61,25 @@
 <li>description: 
     Retrieves problems ordered by <code>submissionTime</code>. </li>
 </ul>
+<h4>ProblemById</h4>
+<ul>
+<li>method: <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerproject.com/problems/&lt;problem_id&gt;</em></li>
+<li>response-body: 
+    { 
+        <code>problemID</code>: Int, 
+        <code>userId</code>: String, 
+        <code>submissionTime</code>: Int, 
+        <code>title</code>: String, 
+        <code>prompt</code>: String 
+    }</li>
+<li>description:
+    Retrieves <code>problemId</code>. </li>
+</ul>
 <h4>Solutions</h4>
 <ul>
 <li>method: <strong>GET</strong></li>
 <li>endpoint: <em>api.rikerproject.com/problems/&lt;problemId&gt;/solutions</em></li>
-<li>params:</li>
 <li>response-body:
     [{ 
         <code>solutionID</code>: Int, 
@@ -79,6 +93,24 @@
     }]</li>
 <li>description: 
     Retrieves solutions for <code>problemId</code> ordered by <code>submissionTime</code>.</li>
+</ul>
+<h4>SolutionById</h4>
+<ul>
+<li>method: <strong>GET</strong></li>
+<li>endpoint: <em>api.rikerproject.com/solutions/&lt;solutionId&gt;</em></li>
+<li>response-body:
+    { 
+        <code>solutionID</code>: Int, 
+        <code>userId</code>: Int, 
+        <code>submissionTime</code>: Int, 
+        <code>problemID</code>: Int, 
+        <code>title</code>: String, 
+        <code>language</code>: String, 
+        <code>source</code>: String, 
+        <code>validation</code>: String 
+    }
+description:
+    Retrieves <code>solutionId</code>. </li>
 </ul>
 <h4>ProblemComments</h4>
 <ul>
