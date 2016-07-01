@@ -60,13 +60,18 @@ class ApiSession(Base):
     expiration = Column(
         DateTime, default=lambda: datetime.utcnow() + timedelta(days=30))
 
+    def get_key(self):
+        """Return session key formatted as hex string"""
+        return binascii.hexlify(self.session_key).decode('utf-8')
+
     def is_expired(self):
         """Check whether session key has expired"""
         return datetime.utcnow() > self.expiration
 
-    def get_key(self):
-        """Return session key formatted as hex string"""
-        return binascii.hexlify(self.session_key).decode('utf-8')
+    def expire(self):
+        """Expires session if not already expired. Does not commit changes."""
+        if not self.is_expired():
+            self.expiration = datetime.utcnow()
 
     @staticmethod
     def get_session(db_session, key):
@@ -134,8 +139,10 @@ class Solution(Base):
                 self.verification = verify.verify(
                     self.language, self.source, self.problem.test_input, 
                     self.problem.test_output, self.problem.timeout)
-            with scoped_db_session() as db_session:
-                db_session.add(self)
+            db_session = DBSession()
+            db_session.add(self)
+            db_session.commit()
+            db_session.close()
 
         eventlet.spawn_n(thread)
         

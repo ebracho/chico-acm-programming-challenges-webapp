@@ -1,14 +1,16 @@
 import json
+import functools
 from flask import request, g, abort, jsonify
 
 import api
 from api.models import (DBSession, User, ApiSession, Problem, Solution, 
     ProblemComment, SolutionComment)
 
+
 # Application context functions
 
 def get_db_session():
-    """Opens a new databse session if there is not one already for the current
+    """Opens a new database session if there is not one already for the current
     application context."""
     if not hasattr(g, 'db_session'):
         g.db_session = DBSession()
@@ -18,6 +20,7 @@ def close_db_session():
     if hasattr(g, 'db_session'):
         g.db_session.commit()
         g.db_session.close()
+        delattr(g, 'db_session')
 
 @api.blueprint.after_request
 def after_request(response):
@@ -28,12 +31,17 @@ def after_request(response):
 # Route exceptions and error handlers
 
 class AuthError(Exception):
-    """Exception for authentication failures"""
+    """Exception for authentication failures."""
     pass
 
 class RequestError(Exception):
-    """Exception for incorrectly formatted or unfulfillable reqeusts"""
+    """Exception for incorrectly formatted or unfulfillable reqeusts."""
     pass
+
+class ResourceNotFound(Exception):
+    """Exception for requests for non-existent resource(s)."""
+    pass
+
 
 def build_error_message(msg):
     """Return json error string"""
@@ -46,6 +54,49 @@ def autherror_handler(e):
 @api.blueprint.errorhandler(RequestError)
 def requesterror_handler(e):
     return jsonify(build_error_message(str(e))), 400
+
+@api.blueprint.errorhandler(ResourceNotFound)
+def resourcenotfound_handler(e):
+    return jsonify(build_error_message(str(e))), 404
+
+
+# Route Decorators
+
+def requires_login(view):
+    """Decorator for views that require valid user credentials. The view 
+    function must accept the kwarg `user_id`."""
+    @functools.wraps
+    def auth_user_wrapper(*args, **kwds):
+        db_session = get_db_session()
+        user_id = request.form.get('userId', None)
+        password = request.form.get('password', None)
+        if user_id is None or password is None:
+            raise RequestError('Missing parameter(s).')
+        user = db_session.query(User).filter(User.id==user_id).first()
+        if user is None:
+            raise AuthError('Invalid userId/password.')
+        elif not user.auth(password):
+            raise AuthError('Invalid userId/password.')
+        return view(*args, user_id=user_id, **kwargs)
+
+    return auth_user_wrapper
+
+
+def requires_api_session(view):
+    """Decorator for views that require an api session. The view function
+    must accept the kwarg `api_session`."""
+    @functools.wraps(view)
+    def auth_api_session_wrapper(*args, **kwds):
+        db_session = get_db_session()
+        api_session_key = request.form.get('sessionKey', None)
+        if api_session_key is None:
+            raise RequestError('Missing parameter(s).')
+        api_session = ApiSession.get_session(db_session, api_session_key)
+        if api_session is None:
+            raise AuthError('Invalid or expired session key')
+        return view(*args, api_session=api_session, **kwds)
+
+    return auth_api_session_wrapper
 
 
 # Routes
@@ -83,29 +134,18 @@ def register():
     
 
 @api.blueprint.route('/create-session', methods=['POST'])
-def create_session():
+@requires_login
+def create_session(user_id):
     """Generate a 30 day api session key"""
-    # Parse request parameters
-    user_id = request.form.get('userId', None)
-    password = request.form.get('password', None)
-    if user_id is None or password is None:
-        raise RequestError('Missing parameter(s).')
-
-    db_session = get_db_session()
-
-    # Validate user credentials
-    user = db_session.query(User).filter(User.id==user_id).first()
-    if user is None:
-        raise AuthError('Incorrect userId/password.')
-    elif not user.auth(password):
-        raise AuthError('Incorrect userId/password.')
-
     # Create api session key
+    db_session = get_db_session()
     api_session = ApiSession(user_id=user_id)
     db_session.add(api_session)
-    db_session.commit() # Apply default column values to api_session
 
-    # Seriealize and return data.
+    # Apply default column values to api_session before serializing
+    db_session.commit() 
+
+    # Serialize and return data.
     res = {
         'userId': api_session.user_id,
         'sessionKey': api_session.get_key(),
@@ -115,351 +155,399 @@ def create_session():
     
 
 @api.blueprint.route('/end-session', methods=['POST'])
-def end_session():
-    """Ends the specified session"""
-    # Parse request parameters
-    api_session_key = request.form.get('sessionKey', None)
-    if api_session_key is None:
-        raise RequestError('Missing parameter(s).')
-
-    db_session = get_db_session()
-
-    # Validate api session
-    if not ApiSession.validate_session(db_session, api_session_key):
-        raise AuthError('Session does not exist.')
-
-    ApiSession.end_session(db_session, api_session_key)
+@requires_api_session
+def end_session(api_session):
+    api_session.expire()
+    get_db_session().add(api_session)
     return ''
     
 
-@api.blueprint.route('/problems', methods=['GET','POST'])
+@api.blueprint.route('/problems', methods=['GET'])
 def problems():
-    """Retrieve or create problem(s)"""
+    user_id = request.args.get('userId', None)
+    limit = request.args.get('limit', None)
+
+    # Build select query
+    db_session = get_db_session()
+    problems = db_session.query(Problem)
+    if user_id is not None:
+        problems = problems.filter(Problem.user_id == user_id)
+    if limit is not None:
+        problems = problems.limit(limit)
+
+    # Serialize and return response body
+    res = [{
+        'problemId': problem.id,
+        'userId': problem.user_id,
+        'submissionTime': problem.submission_time,
+        'title': problem.title,
+        'prompt': problem.prompt
+    } for problem in problems.all() ]
+
+    return jsonify(res)
+
+
+@api.blueprint.route('/problems', methods=['POST'])
+@requires_api_session
+def create_problem(api_session):
+    # Parse form arguments
+    title = request.form.get('title', None)
+    prompt = request.form.get('prompt', None)
+    test_input = request.form.get('testInput', '')
+    test_output = request.form.get('testOutput', '')
+    timeout = request.form.get('timeout', 3)
+    if title is None or prompt is None: 
+        raise RequestError('Missing parameter(s).')
+
+    # Create and write resource
+    problem = Problem(
+        title=title, prompt=prompt, test_input=test_input, 
+        test_output=test_output, timeout=timeout, user_id=user_id)
+    get_db_session().add(problem)
+
+    # Serialize and return response body
+    return jsonify({
+        'problemId': problem.id,
+        'userId': problem.user_id,
+        'submissionTime': problem.submission_time,
+        'title': problem.title,
+        'prompt': problem.prompt
+    })
+
+
+@api.blueprint.route('/problems/<problem_id>', methods=['GET'])
+def problem_by_id(problem_id):
     db_session = get_db_session()
 
-    if request.method == 'GET':
-        # Parse query-string arguments
-        user_id = request.args.get('userId', None)
-        limit = request.args.get('limit', None)
-
-        # Build select query
-        problems = db_session.query(Problem)
-        if user_id is not None:
-            problems = problems.filter(Problem.user_id == user_id)
-        if limit is not None:
-            problems = problems.limit(limit)
-
-        # Serialize and return response body
-        res = [{
-            'problemId': problem.id,
-            'userId': problem.user_id,
-            'submissionTime': problem.submission_time,
-            'title': problem.title,
-            'prompt': problem.prompt
-        } for problem in problems.all() ]
-
-        return jsonify(res)
-        
-    else: # request.method == 'POST'
-        # Validate api session
-        api_session_key = request.form.get('sessionKey', '')
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        user_id = ApiSession.get_user_id(db_session, api_session_key)
-
-        # Parse form arguments
-        title = request.form.get('title', None)
-        prompt = request.form.get('prompt', None)
-        test_input = request.form.get('testInput', '')
-        test_output = request.form.get('testOutput', '')
-        timeout = request.form.get('timeout', 3)
-        if title is None or prompt is None: 
-            raise RequestError('Missing parameter(s).')
-
-        # Create and write resource
-        problem = Problem(
-            title=title, prompt=prompt, test_input=test_input, 
-            test_output=test_output, timeout=timeout, user_id=user_id)
-        db_session.add(problem)
-
-        return ''
+    # Validate problem id
+    problem = db_session.query(Problem).filter(
+        Problem.id == problem_id).first()
+    if problem is None:
+        raise ResourceNotFound('Problem does not exist.')
+    
+    return jsonify({
+        'problemId': problem.id,
+        'userId': problem.user_id,
+        'submissionTime': problem.submission_time,
+        'title': problem.title,
+        'prompt': problem.prompt
+    })
 
 
-@api.blueprint.route('/problems/<problem_id>', methods=['GET', 'DELETE'])
-def problem_by_id(problem_id):
+@api.blueprint.route('/problems/<problem_id>', methods=['DELETE'])
+@requires_api_session
+def delete_problem(api_session, problem_id):
     db_session = get_db_session()
 
     # Parse and validate problem id
     problem = db_session.query(Problem).filter(
         Problem.id == problem_id).first()
     if problem is None:
-        abort(404)
+        raise ResourceNotFound('Problem does not exist.')
 
-    if request.method == 'GET':
-        return jsonify(problem.to_dict())
+    # Verify ownership
+    if problem.user_id != api_session.user_id:
+        raise AuthError('Resource does not belong to user.')
 
-    else: # request.method == 'DELETE'
-        # Parse api session key
-        api_session_key = request.form.get('sessionKey', None)
-        if api_session_key is None:
-            raise RequestError('Missing parameter(s).')
-
-        # Validate api session key
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        if ApiSession.get_user_id(db_session, api_session_key) != problem.user_id:
-            raise AuthError('Resource not owned by user {}.'.format(problem.user_id))
-
-        db_session.delete(problem)
-
-        return ''
+    db_session.delete(problem)
+    return ''
 
 
-@api.blueprint.route('/solutions', methods=['GET','POST'])
+@api.blueprint.route('/solutions', methods=['GET'])
 def solutions():
+    # Parse request args
+    problem_id = request.args.get('problemId', None)
+    user_id = request.args.get('userId', None)
+    language = request.args.get('language', None)
+    verified_only = request.args.get('verifiedOnly', False)
+    limit = request.args.get('limit', None)
+
+    # Build select query
+    solutions = get_db_session().query(Solution)
+    if problem_id:
+        solutions = solutions.filter(Solution.problem_id == problem_id)
+    if user_id:
+        solutions = solutions.filter(Solution.user_id == user_id)
+    if language:
+        solutions = solutions.filter(Solution.language == language)
+    if verified_only: 
+        solutions = solutions.filter(Solution.verified_only == verified_only)
+    if limit:
+        solutions = solutions.limit(limit)
+    
+    # Serialize and return data
+    res = [{
+        'solutionId': solution.id,
+        'userId': solution.user_id,
+        'submissionTime': solusion.submission_time,
+        'problemId': solution.problem_id,
+        'language': solution.language,
+        'source': solution.source,
+        'validation': solution.validation
+    } for solution in solutions.all() ]
+    return jsonify(res)
+
+
+@api.blueprint.route('/solutions', methods=['POST'])
+@requires_api_session
+def create_solution(api_session)
     db_session = get_db_session()
 
-    if request.method == 'GET':
-        # Parse request args
-        problem_id = request.args.get('problemId', None)
-        user_id = request.args.get('userId', None)
-        language = request.args.get('language', None)
-        verified_only = request.args.get('verifiedOnly', False)
-        limit = request.args.get('limit', None)
+    # Parse request args
+    problem_id = request.form.get('problemId', None)
+    language = request.form.get('language', None)
+    source = request.form.get('source', None)
+    if problem_id is None or language is None or source is None:
+        raise RequestError('Missing parameter(s)')
 
-        # Build select query
-        solutions = db_session.query(Solution)
-        if problem_id:
-            solutions = solutions.filter(Solution.problem_id == problem_id)
-        if user_id:
-            solutions = solutions.filter(Solution.user_id == user_id)
-        if language:
-            solutions = solutions.filter(Solution.language == language)
-        if verified_only: 
-            solutions = solutions.filter(Solution.verified_only == verified_only)
-        if limit:
-            solutions = solutions.limit(limit)
-        
-        # Serialize and return data
-        res = [{
-            'solutionId': solution.id,
-            'userId': solution.user_id,
-            'submissionTime': solusion.submission_time,
-            'problemId': solution.problem_id,
-            'language': solution.language,
-            'source': solution.source,
-            'validation': solution.validation
-        } for solution in solutions.all() ]
-        return jsonify(res)
-
-    else: # request.method == 'POST'
-        # Parse request args
-        problem_id = request.form.get('problemId', None)
-        language = request.form.get('language', None)
-        source = request.form.get('source', None)
-        if problem_id is None or language is None or source is None:
-            raise RequestError('Missing parameter(s)')
-
-        # Validate api session
-        api_session_key = request.form.get('sessionKey', None)
-        if api_session_key is None:
-            raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        user_id = ApiSession.get_user_id(db_session, api_session_key)
-        
-        # Check whether problem exists
-        problem = db_session.query(Problem).filter(
-            Problem.id == problem_id).first()
-        if problem is None:
-            raise RequestError('Problem does not exist.')
-
-        # Create solution
-        solution = Solution(
-            problem_id=problem_id, language=language, source=source, 
-            user_id=user_id, verification='pending')
-        db_session.add(solution)
-        
-        # Spawn verify thread
-        solution.verify()
-
-        return ''
-        
-        
-@api.blueprint.route('/solutions/<solution_id>', methods=['GET','DELETE'])
-def solution_by_id(solution_id):
-    db_session = get_db_sesion()
-
-    # Confirm that solution exists
-    solution = db_session.query(Solution).filter(Solution.id == solution_id)
-    if solution is None:
-        abort(404)
-
-    if request.method == 'GET':
-        return jsonify(solution.to_dict())
+    # Check whether problem exists
+    problem = db_session.query(Problem).filter(
+        Problem.id == problem_id).first()
+    if problem is None:
+        raise RequestError('Problem does not exist.')
     
-    else: # request.method == 'DELETE'
-        # Validate api session key
-        api_session_key = request.form.get('sessionKey', None)
-        if api_session_key is None:
-            raise RequestError('No session key provided.')
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        if ApiSession.get_user_id(db_session, api_session_key) != solution.user_id:
-            raise AuthError('Resource not owned by user.')
+    # Create solution
+    solution = Solution(
+        problem_id=problem_id, language=language, source=source, 
+        user_id=user_id, verification='pending')
+    db_session.add(solution)
 
-        session.delete(solution)
-        return ''
+    # Spawn solution verification thread
+    solution.verify()
+
+    # Serialize and return response body
+    return jsonify({
+        'solutionId': solution.id,
+        'userId': solution.user_id,
+        'submissionTime': solusion.submission_time,
+        'problemId': solution.problem_id,
+        'language': solution.language,
+        'source': solution.source,
+        'validation': solution.validation
+    })
 
 
-@api.blueprint.route('/problems/<problem_id>/comments', methods=['GET','POST'])
+@api.blueprint.route('/solutions/<solution_id>', methods=['GET'])
+def solution_by_id(solution_id)
+    db_session = get_db_session()
+
+    # Validate solution id
+    solution = db_session.query(Solution).filter(
+        Solution.id == solution_id).first()
+    if solution is None:
+        raise ResourceNotFound('Solution does not exist.')
+    
+    # Serialize and return response body
+    return jsonify({
+        'solutionId': solution.id,
+        'userId': solution.user_id,
+        'submissionTime': solusion.submission_time,
+        'problemId': solution.problem_id,
+        'language': solution.language,
+        'source': solution.source,
+        'validation': solution.validation
+    })
+
+
+@api.blueprint.route('/solutions/<solution_id>', methods=['DELETE'])
+@requires_api_session
+def delete_solution(api_session, solution_id):
+    db_session = get_db_session
+
+    # Validate solution id
+    solution = db_session.query(Solution).filter(
+        Solution.id == solution_id).first()
+    if solution is None:
+        raise ResourceNotFound('Solution does not exist.')
+
+    # Verify ownership
+    if solution.user_id != api_session.user_id:
+        raise AuthError('Resource does not belong to user.')
+
+    db_session.delete(solution)
+    return ''
+    
+
+@api.blueprint.route('/problems/<problem_id>/comments', methods=['GET'])
 def problem_comments(problem_id):
     db_session = get_db_session()
 
-    if request.method == 'GET':
-        # Create query
-        comments = db_session.query(ProblemComment).filter(
-            ProblemComment.id == problem_id)
+    # Verify that problem exists
+    problem = db_session.query(Problem).filter(
+        Problem.problem_id == problem_id).first()
+    if problem is None:
+        raise ResourceNotFound('Problem does not exist.')
 
-        # Serialize and return response body
-        res = [{
-            'problemCommentId': comment.id,
-            'userId': comment.user_id,
-            'submissionTime': comment.submission_time,
-            'problemId': comment.problem_id,
-            'body': comment.body
-        } for comment in comments.all() ]
-        return jsonify(res)
+    # Create Query
+    comments = db_session.query(ProblemComment).filter(
+        ProblemComment.problem_id == problem_id)
 
-    else: # request.method == 'POST'
-        # Validate api session key
-        api_session_key = request.form.get('sessionKey', None)
-        if api_session_key is None:
-            raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        
-        # Create comment
-        user_id = ApiSession.get_user_id(db_session, api_session_key)
-        comment = ProblemComment(
-            problem_id=problem_id, user_id=user_id, body=body)
-        db_session.add(comment)
+    # Serialize and return response body
+    res = [{
+        'problemCommentId': comment.id,
+        'userId': comment.user_id,
+        'submissionTime': comment.submission_time,
+        'problemId': comment.problem_id,
+        'body': comment.body
+    } for comment in comments.all() ]
+    return jsonify(res)
+    
 
-        # Serialize and return response body
-        return jsonify({
-            'problemCommentid': comment.id,
-            'userId': comment.user_id,
-            'submissionTime': comment.submission_time,
-            'problemId': comment.problem_id,
-            'body': comment.body
-        })
+@api.blueprint.route('/problems/<problem_id>/comments', methods=['POST'])
+@requires_api_session
+def create_problem_comment(api_session, problem_id)
+    db_session = get_db_session()
+    
+    # Verify that problem exists
+    problem = db_session.query(Problem).filter(
+        Problem.problem_id == problem_id).first()
+    if problem is None:
+        raise ResourceNotFound('Problem does not exist.')
+
+    # Validate form input
+    body = reqeust.form.get('Body', None)
+    if body is None:
+        raise RequestError('Missing parameter(s)')
+
+    # Create comment
+    comment = ProblemComment(
+        problem_id=problem_id, user_id=api_session.user_id, body=body)
+    db_session.add(comment)
+    db_session.commit() # Apply default column values to comment
+
+    # Serialize and return response body
+    return jsonify({
+        'problemCommentId': comment.id,
+        'userId': comment.user_id,
+        'problemId': comment.problem_id,
+        'submissionTime': comment.submission_time,
+        'body': comment.body
+    })
 
 
-@api.blueprint.route('/problems/comments/<comment_id>', methods=['GET','DELETE'])
-def problem_comments_by_id(comment_id):
+@api.blueprint.route('/problems/comments/<comment_id>', methods=['GET'])
+def problem_comment_by_id(comment_id):
     db_session = get_db_session()
 
+    # Verify that comment exists.
     comment = db_session.query(ProblemComment).filter(
         ProblemComment.id == comment_id).first()
     if comment is None:
-        abort(404)
+        raise ResourceNotFound('Problem comment does not exist.')
 
-    if request.method == 'GET':
-        return jsonify({
-            'problemCommentid': comment.id,
-            'userId': comment.user_id,
-            'submissionTime': comment.submission_time,
-            'problemId': comment.problem_id,
-            'body': comment.body
-        })
-
-    else: # request.method == 'DELETE'
-        # Validate api session key
-        api_session_key = request.form.get('sessionKey', None)
-        if api_session_key is None:
-            raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        if ApiSession.get_user_id(db_session, api_session_key) != comment.user_id:
-            raise AuthError('Resource not owned by user.')
-    
-        session.delete(comment)
-    
-        return ''
+    # Serialize and return response body
+    return jsonify({
+        'problemCommentId': comment.id,
+        'userId': comment.user_id,
+        'problemId': comment.problem_id,
+        'submissionTime': comment.submission_time,
+        'body': comment.body
+    })
 
 
-@api.blueprint.route('/solution/<solution_id>/comments', methods=['GET','POST'])
-def solution_comments(solution_id):
+@api.blueprint.route('/problems/comments/<comment_id>', methods=['DELETE'])
+@requires_api_session
+def delete_problem_comment(api_sesion, comment_id)
     db_session = get_db_session()
 
-    if request.method == 'GET':
-        comments = db_session.query(SolutionComment).filter(
-            SolutionComment.id == solution_id)
+    # Verify that comment exists.
+    comment = db_session.query(ProblemComment).filter(
+        ProblemComment.id == comment_id).first()
+    if comment is None:
+        raise ResourceNotFound('Problem comment does not exist.')
 
-        # Serialize and return data
-        res = [{
-            'solutionCommentId': comment.id,
-            'userId': comment.user_id,
-            'submissionTime': comment.submission_time,
-            'solutionId': comment.solution_id,
-            'body': comment.body
-        } for comment in comments.all() ]
-        return jsonify(res)
+    # Verify resource ownership
+    if api_session.user_id != comment.user_id:
+        raise AuthError('Resource not does not belong to user.')
 
-    else: # request.method == 'POST'
-        # Validate api session key
-        api_session_key = request.form.get('sessionKey', None)
-        if api_session_key is None:
-            raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        
-        # Create comment
-        user_id = ApiSession.get_user_id(db_session, api_session_key)
-        comment = SolutionComment(
-            solution_id=solution_id, user_id=user_id, body=body)
-        db_session.add(comment)
+    db_session.delete(comment)
+    return ''
+    
 
-        # Serialize and return response body
-        return jsonify({
-            'solutionCommentId': comment.id,
-            'userId': comment.user_id,
-            'submissionTime': comment.submission_time,
-            'solutionId': comment.solution_id,
-            'body': comment.body
-        })
-
-
-@api.blueprint.route('/solutions/comments/<comment_id>', methods=['GET','DELETE'])
-def solution_comments_by_id(comment_id):
+@api.blueprint.route('/solution/<solution_id>/comments', methods=['GET'])
+def solution_comment(solution_id):
     db_session = get_db_session()
 
+    # Verify that solution exists.
+    solution = db_session.query(Solution).filter(
+        Solution.id == solution_id).first()
+    if solution is None:
+        raise ResourceNotFound('Solution does not exist.')
+
+    # Create query
+    comments = db_session.query(SolutionComment).filter(
+        SolutionComment.id == solution_id)
+
+    # Serialize and return data
+    res = [{
+        'solutionCommentId': comment.id,
+        'userId': comment.user_id,
+        'submissionTime': comment.submission_time,
+        'solutionId': comment.solution_id,
+        'body': comment.body
+    } for comment in comments.all() ]
+    return jsonify(res)
+    
+
+@api.blueprint.route('/solution/<solution_id>/comments', methods=['POST'])
+@requires_api_session
+def create_solution_comment(api_session, solution_id)
+    db_session = get_db_session()
+
+    # Verify that solution exists.
+    solution = db_session.query(Solution).filter(
+        Solution.id == solution_id).first()
+    if solution is None:
+        raise ResourceNotFound('Solution does not exist.')
+
+    # Validate form input
+    body = request.form.get('body', None)
+    if body is None:
+        raise RequestError('Missing parameter(s).')
+
+    # Create solution comment
+    solution_comment = SolutionComment(
+        solution_id=solution_id, user_id=api_session.user_id, body=body)
+    db_session.add(solution_comment)
+
+    return ''
+
+
+@api.blueprint.route('/solutions/comments/<comment_id>', methods=['GET'])
+def solution_comment_by_id(comment_id)
+    db_session = get_db_session()
+
+    # Verify existence of comment
     comment = db_session.query(SolutionComment).filter(
         SolutionComment.id == comment_id).first()
-    if problem_comment is None:
-        abort(404)
+    if comment is None:
+        raise ResourceNotFound('Solution comment does not exist.')
 
-    if request.method == 'GET':
-        # Serialize and return response body
-        return jsonify({
-            'solutionCommentId': comment.id,
-            'userId': comment.user_id,
-            'submissionTime': comment.submission_time,
-            'solutionId': comment.solution_id,
-            'body': comment.body
-        })
-    
-    else: # request.method == 'DELETE'
-        # Validate api session key
-        api_session_key = request.form.get('sessionKey', None)
-        if api_session_key is None:
-            raise AuthError('No session key provided.')
-        if not ApiSession.validate_session(db_session, api_session_key):
-            raise AuthError('Invalid or expired session key.')
-        if ApiSession.get_user_id(db_session, api_session_key) != problem_comment.user_id:
-            raise AuthError('Resource not owned by user.')
-    
-        session.delete(comment)
-    
-        return ''
+    # Serialize and return response body
+    return jsonify({
+        'solutionCommentId': comment.id,
+        'userId': comment.user_id,
+        'submissionTime': comment.submission_time,
+        'solutionId': comment.solution_id,
+        'body': comment.body
+    })
 
+
+@api.blueprint.route('/solutions/comments/<comment_id>', methods=['DELETE'])
+@requires_api_session
+def delete_solution_comment(api_session, comment_id):
+    db_session = get_db_session()
+
+    # Verify existence of comment
+    comment = db_session.query(SolutionComment).filter(
+        SolutionComment.id == comment_id).first()
+    if comment is None:
+        raise ResourceNotFound('Solution comment does not exist.')
+
+    # Verify ownership of comment
+    if api_session.user_id != comment.user_id:
+        raise AuthError('Resource does not belong to user.')
+
+    db_session.delete(comment)
+    return ''
+    
