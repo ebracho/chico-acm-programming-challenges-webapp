@@ -65,7 +65,7 @@ def resourcenotfound_handler(e):
 def requires_login(view):
     """Decorator for views that require valid user credentials. The view 
     function must accept the kwarg `user_id`."""
-    @functools.wraps
+    @functools.wraps(view)
     def auth_user_wrapper(*args, **kwds):
         db_session = get_db_session()
         user_id = request.form.get('userId', None)
@@ -102,8 +102,8 @@ def requires_api_session(view):
 # Routes
 
 @api.blueprint.route('/')
-def doc():
-    """Return contents of api.html"""
+def root():
+    """Serve api doc page"""
     with open('api/api.html') as f:
         return f.read()
 
@@ -169,7 +169,7 @@ def problems():
 
     # Build select query
     db_session = get_db_session()
-    problems = db_session.query(Problem)
+    problems = db_session.query(Problem).order_by(Problem.submission_time)
     if user_id is not None:
         problems = problems.filter(Problem.user_id == user_id)
     if limit is not None:
@@ -234,6 +234,34 @@ def problem_by_id(problem_id):
     })
 
 
+@api.blueprint.route('/problems/<problem_id>', methods=['PUT'])
+@requires_api_session
+def update_problem(api_session, problem_id):
+    """Updates `problem_id`. Parameters not provided will keep 
+    their original values"""
+    db_session = get_db_session()
+
+    # Parse and validate problem id
+    problem = db_session.query(Problem).filter(
+        Problem.id == problem_id).first()
+    if problem is None:
+        raise ResourceNotFound('Problem does not exist.')
+
+    # Verify ownership
+    if problem.user_id != api_session.user_id:
+        raise AuthError('Resource does not belong to user.')
+
+    # Update problem
+    problem.title = request.form.get('title', problem.title)
+    problem.prompt = request.form.get('prompt', problem.prompt)
+    problem.test_input = request.form.get('testInput', problem.test_input)
+    problem.test_output = request.form.get('testOutput', problem.test_output)
+    problem.timeout = request.form.get('timeout', problem.timeout)
+
+    return ''
+    
+    
+
 @api.blueprint.route('/problems/<problem_id>', methods=['DELETE'])
 @requires_api_session
 def delete_problem(api_session, problem_id):
@@ -263,7 +291,7 @@ def solutions():
     limit = request.args.get('limit', None)
 
     # Build select query
-    solutions = get_db_session().query(Solution)
+    solutions = get_db_session().query(Solution).order_by(Solution.submission_time)
     if problem_id:
         solutions = solutions.filter(Solution.problem_id == problem_id)
     if user_id:
@@ -290,7 +318,7 @@ def solutions():
 
 @api.blueprint.route('/solutions', methods=['POST'])
 @requires_api_session
-def create_solution(api_session)
+def create_solution(api_session):
     db_session = get_db_session()
 
     # Parse request args
@@ -328,7 +356,7 @@ def create_solution(api_session)
 
 
 @api.blueprint.route('/solutions/<solution_id>', methods=['GET'])
-def solution_by_id(solution_id)
+def solution_by_id(solution_id):
     db_session = get_db_session()
 
     # Validate solution id
@@ -348,6 +376,28 @@ def solution_by_id(solution_id)
         'validation': solution.validation
     })
 
+
+@api.blueprint.route('/solutions/<solution_id>', methods=['PUT'])
+@requires_api_session
+def update_solution(api_session, solution_id):
+    db_session = get_db_session()
+
+    # Validate solution id
+    solution = db_session.query(Solution).filter(
+        Solution.id == solution_id).first()
+    if solution is None:
+        raise ResourceNotFound('Solution does not exist.')
+
+    # Verify ownership
+    if solution.user_id != api_session.user_id:
+        raise AuthError('Resource does not belong to user.')
+
+    # Update solution
+    solution.language = request.form.get('language', solution.language)
+    source = request.form.get('source', solution.source)
+    
+    return ''
+    
 
 @api.blueprint.route('/solutions/<solution_id>', methods=['DELETE'])
 @requires_api_session
@@ -379,8 +429,11 @@ def problem_comments(problem_id):
         raise ResourceNotFound('Problem does not exist.')
 
     # Create Query
-    comments = db_session.query(ProblemComment).filter(
-        ProblemComment.problem_id == problem_id)
+    comments = (
+        db_session.query(ProblemComment)
+        .filter(ProblemComment.problem_id == problem_id)
+        .order_by(ProblemComment.submission_time)
+    )
 
     # Serialize and return response body
     res = [{
@@ -395,7 +448,7 @@ def problem_comments(problem_id):
 
 @api.blueprint.route('/problems/<problem_id>/comments', methods=['POST'])
 @requires_api_session
-def create_problem_comment(api_session, problem_id)
+def create_problem_comment(api_session, problem_id):
     db_session = get_db_session()
     
     # Verify that problem exists
@@ -445,9 +498,29 @@ def problem_comment_by_id(comment_id):
     })
 
 
+@api.blueprint.route('/problems/comments/<comment_id>', methods=['PUT'])
+@requires_api_session
+def update_problem_comment(api_session, comment_id):
+    db_session = get_db_session()
+
+    # Verify that comment exists.
+    comment = db_session.query(ProblemComment).filter(
+        ProblemComment.id == comment_id).first()
+    if comment is None:
+        raise ResourceNotFound('Problem comment does not exist.')
+
+    # Verify resource ownership
+    if api_session.user_id != comment.user_id:
+        raise AuthError('Resource not does not belong to user.')
+
+    # Update problem comment
+    comment.body = request.form.get('body', comment.body)
+
+    return ''
+
 @api.blueprint.route('/problems/comments/<comment_id>', methods=['DELETE'])
 @requires_api_session
-def delete_problem_comment(api_sesion, comment_id)
+def delete_problem_comment(api_sesion, comment_id):
     db_session = get_db_session()
 
     # Verify that comment exists.
@@ -475,8 +548,11 @@ def solution_comment(solution_id):
         raise ResourceNotFound('Solution does not exist.')
 
     # Create query
-    comments = db_session.query(SolutionComment).filter(
-        SolutionComment.id == solution_id)
+    comments = (
+        db_session.query(SolutionComment)
+        .filter(SolutionComment.id == solution_id)
+        .order_by(SolutionComment.submission_time)
+    )
 
     # Serialize and return data
     res = [{
@@ -491,7 +567,7 @@ def solution_comment(solution_id):
 
 @api.blueprint.route('/solution/<solution_id>/comments', methods=['POST'])
 @requires_api_session
-def create_solution_comment(api_session, solution_id)
+def create_solution_comment(api_session, solution_id):
     db_session = get_db_session()
 
     # Verify that solution exists.
@@ -514,7 +590,7 @@ def create_solution_comment(api_session, solution_id)
 
 
 @api.blueprint.route('/solutions/comments/<comment_id>', methods=['GET'])
-def solution_comment_by_id(comment_id)
+def solution_comment_by_id(comment_id):
     db_session = get_db_session()
 
     # Verify existence of comment
@@ -535,6 +611,27 @@ def solution_comment_by_id(comment_id)
 
 @api.blueprint.route('/solutions/comments/<comment_id>', methods=['DELETE'])
 @requires_api_session
+def update_solution_comment(api_session, comment_id):
+    db_session = get_db_session()
+
+    # Verify existence of comment
+    comment = db_session.query(SolutionComment).filter(
+        SolutionComment.id == comment_id).first()
+    if comment is None:
+        raise ResourceNotFound('Solution comment does not exist.')
+
+    # Verify ownership of comment
+    if api_session.user_id != comment.user_id:
+        raise AuthError('Resource does not belong to user.')
+
+    # Update solution comment
+    comment.body = request.form.get('body', comment.body)
+
+    return ''
+
+
+@api.blueprint.route('/solutions/comments/<comment_id>', methods=['DELETE'])
+@requires_api_session
 def delete_solution_comment(api_session, comment_id):
     db_session = get_db_session()
 
@@ -551,3 +648,63 @@ def delete_solution_comment(api_session, comment_id):
     db_session.delete(comment)
     return ''
     
+
+@api.blueprint.route('/users', methods=['GET'])
+def users():
+    db_session = get_db_session
+    users = db_session.query(User).order_by(User.creation_time)
+
+    res = [{
+        'userId': user.id,
+        'creationTime': user.creation_time
+    } for user in users.all() ]
+    return jsonify(res)
+    
+
+@api.blueprint.route('/users/<user_id>', methods=['GET'])
+def user_by_id(user_id):
+    db_session = get_db_session()
+
+    # Lookup user
+    user = db_session.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise ResourceNotFound('User does not exist.')
+
+    # Build queries to aggregate submissions by user
+    problems = (
+        db_session.query(Problem)
+        .filter(Problem.user_id == user.id)
+        .order_by(Problem.submission_time)
+    )
+    solutions = (
+        db_session.query(Solution)
+        .filter(Solution.user_id == user.id)
+        .order_by(Solution.submission_time)
+    )
+    problem_comments = (
+        db_session.query(ProblemComment)
+        .filter(ProblemComment.user_id == user.id)
+        .order_by(ProblemComment.submission_time)
+    )
+    solution_comments = (
+        db_session.query(SolutionComment)
+        .filter(SolutionComment.user_id == user.id)
+        .order_by(SolutionComment.submission_time)
+    )
+    
+    # Get ids of content submitted by user
+    problem_ids = [problem.id for problem in problems.all()]
+    solution_ids = [solution.id for solution in solutions.all()]
+    problem_comment_ids = [comment.id for comment in problem_comments.all()]
+    solution_comment_ids = [comment.id for comment in solution_comments.all()]
+
+    # Serialize and return response body
+    return jsonify({
+        'userId': user.id,
+        'creationTime': user.creation_time,
+        'problems': problem_ids,
+        'solutions': solution_ids,
+        'problemComments': problem_comment_ids,
+        'solutionComments': solution_comment_ids
+    })
+

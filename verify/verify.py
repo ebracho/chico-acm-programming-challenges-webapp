@@ -20,13 +20,12 @@ class ProgramTimeout(Exception):
     pass
 
 
-docker_run_cmd = 'docker run --net=none -m 500m --ulimit nproc=30 \
-    -v {0}:/home/unprivileged -w /home/unprivileged -e LANGUAGE={1} \
-    verify /bin/bash entry'
+docker_run_cmd = """docker run --net=none -m 500m --ulimit nproc=30 
+    -v {0}:/home/unprivileged -w /home/unprivileged -e LANGUAGE={1} 
+    verify /bin/bash entry"""
 
 def run_program(language, source, testinput, timeout=3):
-    """
-    Launches docker container to run `source` with given `language` and 
+    """Launches docker container to run `source` with given `language` and 
     `testinput`. Returns stdout of program.
     """
     if language not in supported_languages:
@@ -62,8 +61,7 @@ def run_program(language, source, testinput, timeout=3):
 
 
 def verify(language, source, testinput, testoutput, timeout=3):
-    """
-    Wrapper for `run_program` that compares program output with `testoutput`.
+    """Wrapper for `run_program` that compares program output with `testoutput`.
     Invokes `callback` with an appropriate status message after call to
     `run_program`.
     """
