@@ -111,6 +111,8 @@ def root():
 @api.blueprint.route('/register', methods=['POST'])
 def register():
     """Create new user"""
+    db_session = get_db_session()
+
     # Parse request parameters
     user_id = request.form['userId']
     password = request.form['password']
@@ -118,7 +120,7 @@ def register():
         raise RequestError('Missing parameter(s).')
 
     # Validate parameters
-    if User.exists(user_id):
+    if User.exists(db_session, user_id):
         raise RequestError('User {0} already exists.'.format(user_id))
     if not 3 <= len(user_id) <= 15:
         raise RequestError('User id must be between 3 and 15 chars.')
@@ -126,7 +128,6 @@ def register():
         raise RequestError('Password must be between 7 and 128 chars.')
 
     # Create new user
-    db_session = get_db_session()
     new_user = User(user_id, password)
     db_session.add(new_user)
 

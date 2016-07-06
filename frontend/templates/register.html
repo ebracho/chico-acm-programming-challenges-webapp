@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block body %}
+
+	<div id="register-form"></div>
+
+	<script type="text/babel" src="{{url_for('frontend.static', filename='register.js')}}"></script>
+	<script type="text/babel">
+		ReactDOM.render(
+			React.createElement(Riker.RegisterForm, {url: Riker.getApiEndpoint('register')}),
+			document.getElementById('register-form')
+		);
+	</script>
+
+	
+{% endblock %}
+

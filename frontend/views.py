@@ -1,7 +1,7 @@
-from flask import url_for
+from flask import render_template
 import frontend
 
-@frontend.blueprint.route('/problems')
+@frontend.blueprint.route('/register')
 def problems():
-    return render_template('problems')
+    return render_template('register.html')
 
