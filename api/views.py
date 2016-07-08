@@ -1,6 +1,6 @@
 import json
 import functools
-from flask import request, g, abort, jsonify
+from flask import request, g, abort, jsonify, session
 
 import api
 from api.models import (DBSession, User, ApiSession, Problem, Solution, 
@@ -26,6 +26,11 @@ def close_db_session():
 def after_request(response):
     close_db_session()
     return response
+
+def set_api_session_cookies(api_session):
+    session['sessionUserId'] = api_session.user_id
+    session['sessionKey'] = api_session.get_key()
+    session['sessionExpiration'] = api_session.expiration
 
 
 # Route exceptions and error handlers
@@ -88,7 +93,7 @@ def requires_api_session(view):
     @functools.wraps(view)
     def auth_api_session_wrapper(*args, **kwds):
         db_session = get_db_session()
-        api_session_key = request.form.get('sessionKey', None)
+        api_session_key = session.get('apiSessionKey', None)
         if api_session_key is None:
             raise RequestError('Missing parameter(s).')
         api_session = ApiSession.get_session(db_session, api_session_key)
@@ -127,9 +132,15 @@ def register():
     if not 7 <= len(password) <= 128:
         raise RequestError('Password must be between 7 and 128 chars.')
 
-    # Create new user
+    # Create new user and start api session
     new_user = User(user_id, password)
+    api_session = ApiSession(user_id=user_id)
     db_session.add(new_user)
+    db_session.add(api_session)
+
+    # Set api session cookies
+    db_session.commit() # apply default col vals to api_session before setting cookies
+    set_api_session_cookies(api_session)
 
     return ''
     
@@ -143,16 +154,12 @@ def create_session(user_id):
     api_session = ApiSession(user_id=user_id)
     db_session.add(api_session)
 
-    # Apply default column values to api_session before serializing
+    # Apply default column values to api_session before setting cookies
     db_session.commit() 
+    set_api_session_cookies(api_session)
 
-    # Serialize and return data.
-    res = {
-        'userId': api_session.user_id,
-        'sessionKey': api_session.get_key(),
-        'expiration': api_session.expiration
-    }
-    return jsonify(res)
+    return ''
+
     
 
 @api.blueprint.route('/end-session', methods=['POST'])
@@ -203,7 +210,7 @@ def create_problem(api_session):
     # Create and write resource
     problem = Problem(
         title=title, prompt=prompt, test_input=test_input, 
-        test_output=test_output, timeout=timeout, user_id=user_id)
+        test_output=test_output, timeout=timeout, user_id=api_session.user_id)
     get_db_session().add(problem)
 
     # Serialize and return response body
@@ -273,8 +280,6 @@ def delete_problem(api_session, problem_id):
         Problem.id == problem_id).first()
     if problem is None:
         raise ResourceNotFound('Problem does not exist.')
-
-    # Verify ownership
     if problem.user_id != api_session.user_id:
         raise AuthError('Resource does not belong to user.')
 
@@ -338,7 +343,7 @@ def create_solution(api_session):
     # Create solution
     solution = Solution(
         problem_id=problem_id, language=language, source=source, 
-        user_id=user_id, verification='pending')
+        user_id=api_session.user_id, verification='pending')
     db_session.add(solution)
 
     # Spawn solution verification thread
