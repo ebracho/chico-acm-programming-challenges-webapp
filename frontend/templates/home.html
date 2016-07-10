@@ -2,5 +2,17 @@
 
 {% block content %}
 	<h1>Welcome to Riker</h1>
+
+	<h2>Problems</h2>
+	<div id="problem-list"></div>
+
+	<script type="text/babel" src="{{url_for('frontend.static', filename='problemlist.js')}}"></script>
+	<script type="text/babel">
+		ReactDOM.render(
+			React.createElement(Riker.ProblemList),
+			document.getElementById('problem-list')
+		);
+	</script>
+
 {% endblock %}
 
