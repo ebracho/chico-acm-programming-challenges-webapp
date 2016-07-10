@@ -27,10 +27,12 @@ def after_request(response):
     close_db_session()
     return response
 
-def set_api_session_cookies(api_session):
-    session['sessionUserId'] = api_session.user_id
-    session['sessionKey'] = api_session.get_key()
-    session['sessionExpiration'] = api_session.expiration
+def set_api_session_cookie(api_session):
+    session['apiSessionKey'] = api_session.get_key()
+
+def clear_api_session_cookie():
+    if hasattr(session, 'sessionKey'):
+        session.pop('apiSessionKey')
 
 
 # Route exceptions and error handlers
@@ -82,7 +84,7 @@ def requires_login(view):
             raise AuthError('Invalid userId/password.')
         elif not user.auth(password):
             raise AuthError('Invalid userId/password.')
-        return view(*args, user_id=user_id, **kwargs)
+        return view(*args, user_id=user_id, **kwds)
 
     return auth_user_wrapper
 
@@ -138,11 +140,14 @@ def register():
     db_session.add(new_user)
     db_session.add(api_session)
 
-    # Set api session cookies
-    db_session.commit() # apply default col vals to api_session before setting cookies
-    set_api_session_cookies(api_session)
+    # Set api session cookie
+    db_session.commit() # apply default col vals to api_session before setting cookie
+    set_api_session_cookie(api_session)
 
-    return ''
+    return jsonify({
+        'userId': user_id,
+        'expiration': api_session.expiration
+    })
     
 
 @api.blueprint.route('/create-session', methods=['POST'])
@@ -154,17 +159,21 @@ def create_session(user_id):
     api_session = ApiSession(user_id=user_id)
     db_session.add(api_session)
 
-    # Apply default column values to api_session before setting cookies
+    # Apply default column values to api_session before setting cookie
     db_session.commit() 
-    set_api_session_cookies(api_session)
+    set_api_session_cookie(api_session)
 
-    return ''
+    return jsonify({
+        'userId': user_id,
+        'expiration': api_session.expiration
+    })
 
     
 
 @api.blueprint.route('/end-session', methods=['POST'])
 @requires_api_session
 def end_session(api_session):
+    clear_api_session_cookie()
     api_session.expire()
     get_db_session().add(api_session)
     return ''

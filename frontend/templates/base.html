@@ -5,17 +5,31 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.24/browser.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/remarkable/1.6.2/remarkable.min.js"></script>
-	
+
 </head>
 <body>
+
+	<div id='navbar'></div>
+
+	{% block content %}{% endblock %}
+
 	<script>
-		Riker = {
+		/* create api url generator */
+		var Riker = {
 			apiPrefix: {{ url_for('api.root') }},
 			getApiEndpoint: function(suffix) {
 				return this.apiPrefix + suffix;
 			}
 		};
 	</script>
-	{% block body %}{% endblock %}
+
+	<script type="text/babel" src="{{url_for('frontend.static', filename='navbar.js')}}"></script>
+	<script type="text/babel">
+		/* build navbar */
+		ReactDOM.render(
+			React.createElement(Riker.Navbar),
+			document.getElementById('navbar')
+		);
+	</script>
 </body>
 

@@ -3,7 +3,8 @@ Riker.RegisterForm = React.createClass({
 		return {
 			userId: '',
 			password: '',
-			passwordCheck: ''
+			passwordCheck: '',
+			errorMsg: ''
 		};
 	},
 	updateField: function(field) {
@@ -22,16 +23,20 @@ Riker.RegisterForm = React.createClass({
 			this.handleError('Passwords do not match.');
 		}
 		else {
+			var userId = this.state.userId
+			var password = this.state.password
 			$.ajax({
 				url: this.props.url,
 				dataType: 'json',
 				type: 'POST',
 				data: {
-					userId: this.state.userId,
-					password: this.state.password
+					userId: userId,
+					password: password
 				},
 				success: function(data) {
-					console.log('success');
+					localStorage.setItem('loggedInUser', data.userId);
+					localStorage.setItem('sessionExpiration', Date.parse(data.expiration));
+					window.location.replace('/');
 				},
 				error: function(xhr, status, err) {
 					var responseBody = $.parseJSON(xhr.responseText);
