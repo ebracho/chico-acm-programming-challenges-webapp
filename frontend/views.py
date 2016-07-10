@@ -16,3 +16,8 @@ def register():
 def login():
     return render_template('login.html')
 
+
+@frontend.blueprint.route('/submit-problem')
+def submit_problem():
+    return render_template('submitproblem.html')
+

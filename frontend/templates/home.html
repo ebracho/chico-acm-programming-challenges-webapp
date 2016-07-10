@@ -9,7 +9,7 @@
 	<script type="text/babel" src="{{url_for('frontend.static', filename='problemlist.js')}}"></script>
 	<script type="text/babel">
 		ReactDOM.render(
-			React.createElement(Riker.ProblemList),
+			React.createElement(Riker.ProblemList, {pollInterval: 10000}),
 			document.getElementById('problem-list')
 		);
 	</script>

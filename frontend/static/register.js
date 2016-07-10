@@ -23,15 +23,13 @@ Riker.RegisterForm = React.createClass({
 			this.handleError('Passwords do not match.');
 		}
 		else {
-			var userId = this.state.userId
-			var password = this.state.password
 			$.ajax({
 				url: this.props.url,
 				dataType: 'json',
 				type: 'POST',
 				data: {
-					userId: userId,
-					password: password
+					userId: this.state.userId,
+					password: this.state.password
 				},
 				success: function(data) {
 					localStorage.setItem('loggedInUser', data.userId);

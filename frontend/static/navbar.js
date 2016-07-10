@@ -27,6 +27,7 @@ Riker.Navbar = React.createClass({
 		return (
 			<ul>
 				<li><a href="/">home</a></li>
+				<li><a href="/submit-problem">submit problem</a></li>
 
 				{/* Elements shown when logged in */}
 				<li style={this.state.loggedIn ? {} : hideStyle}><a href={"/user/" + userId}>{userId}</a></li>
