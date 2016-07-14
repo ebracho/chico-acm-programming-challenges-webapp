@@ -9,10 +9,6 @@
 </head>
 <body>
 
-	<div id='navbar'></div>
-
-	{% block content %}{% endblock %}
-
 	<script>
 		/* create api url generator */
 		var Riker = {
@@ -23,6 +19,9 @@
 		};
 	</script>
 
+	<div id='navbar'></div>
+	<hr />
+
 	<script type="text/babel" src="{{url_for('frontend.static', filename='navbar.js')}}"></script>
 	<script type="text/babel">
 		/* build navbar */
@@ -31,5 +30,8 @@
 			document.getElementById('navbar')
 		);
 	</script>
+
+	{% block content %}{% endblock %}
+
 </body>
 

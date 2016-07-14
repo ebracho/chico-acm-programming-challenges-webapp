@@ -21,3 +21,8 @@ def login():
 def submit_problem():
     return render_template('submitproblem.html')
 
+
+@frontend.blueprint.route('/problem/<problem_id>')
+def problem(problem_id):
+    return render_template('problem.html', problem_id=problem_id)
+

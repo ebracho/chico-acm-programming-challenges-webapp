@@ -19,7 +19,6 @@ Riker.Navbar = React.createClass({
 		console.log('logged out');
 	},
 	render: function() {
-		console.log('rendering navbar');
 		var hideStyle = {
 			display: 'none'
 		};
@@ -40,6 +39,4 @@ Riker.Navbar = React.createClass({
 		);
 	}
 });
-
-console.log(Riker.Navbar);
 

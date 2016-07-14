@@ -24,7 +24,7 @@ Riker.ProblemList = React.createClass({
 	render: function() {
 		var problemNodes = this.state.problems.map(function(problem) {
 			return (
-				<li><a href={"/problem/" + problem.id}>{problem.title}</a></li>
+				<li><a href={"/problem/" + problem.problemId}>{problem.title}</a></li>
 			);
 		});
 		return (
