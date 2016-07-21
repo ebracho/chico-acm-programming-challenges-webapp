@@ -36,8 +36,13 @@ Riker.ProblemForm = React.createClass({
 				window.location.replace('/problems/' + data.problemId);
 			},
 			error: function(xhr, status, err) {
-				var responseBody = $.parseJSON(xhr.responseText);
-				this.handleError(responseBody.errorMsg);
+				if (xhr.status == 401) {
+					this.handleError('You must be logged in to do that');
+				}
+				else {
+					var responseBody = $.parseJSON(xhr.responseText);
+					this.handleError(responseBody.errorMsg);
+				}
 			}.bind(this)
 		});
 	},

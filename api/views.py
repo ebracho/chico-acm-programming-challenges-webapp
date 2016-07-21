@@ -31,7 +31,7 @@ def set_api_session_cookie(api_session):
     session['apiSessionKey'] = api_session.get_key()
 
 def clear_api_session_cookie():
-    if hasattr(session, 'sessionKey'):
+    if hasattr(session, 'apiSessionKey'):
         session.pop('apiSessionKey')
 
 
@@ -99,7 +99,7 @@ def requires_api_session(view):
         if api_session_key is None:
             raise RequestError('Missing api session key')
         api_session = ApiSession.get_session(db_session, api_session_key)
-        if api_session is None:
+        if api_session is None or api_session.is_expired():
             raise AuthError('Invalid or expired session key')
         return view(*args, api_session=api_session, **kwds)
 

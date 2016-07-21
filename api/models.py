@@ -145,10 +145,14 @@ class Solution(Base):
             db_session = DBSession()
             solution = db_session.query(Solution).filter(
                 Solution.id == solution_id).first()
+
+            print(solution.problem.timeout)
+
             with Solution._verify_sem:
                 solution.verification = verify.verify(
                     solution.language, solution.source, solution.problem.test_input, 
                     solution.problem.test_output, solution.problem.timeout)
+
             db_session.add(solution)
             db_session.commit()
             db_session.close()

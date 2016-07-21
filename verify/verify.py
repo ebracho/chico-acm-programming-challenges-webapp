@@ -63,8 +63,7 @@ def run_program(language, source, testinput, timeout=3):
 def verify(language, source, testinput, testoutput, timeout=3):
     """Wrapper for `run_program` that compares program output with `testoutput`.
     Invokes `callback` with an appropriate status message after call to
-    `run_program`.
-    """
+    `run_program`."""
     try:
         output = run_program(language, source, testinput, timeout)
         status = 'PASS' if output == testoutput else 'FAIL'
