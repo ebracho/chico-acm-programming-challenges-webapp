@@ -1,5 +1,7 @@
 Riker.Navbar = React.createClass({
 	getInitialState: function() {
+		console.log(document.cookie);
+		var sessionCookieExists = document.cookie.indexOf('session') != -1;
 		return {
 			loggedIn: 'sessionExpiration' in localStorage && Date.now() < localStorage.sessionExpiration
 		};

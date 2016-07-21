@@ -114,6 +114,12 @@ class Problem(Base):
     test_output = Column(String)
     timeout = Column(Integer, default=3)
 
+    @staticmethod
+    def exists(db_session, problem_id):
+        """Return True if problem_id exists"""
+        problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
+        return problem is not None
+        
 
 eventlet.monkey_patch() # Required for eventlet to work with Flask
 class Solution(Base):
@@ -129,22 +135,31 @@ class Solution(Base):
     problem = relationship('Problem')
 
     _verify_sem = eventlet.semaphore.Semaphore(4)
-    def verify(self):
-        """Verifies the correctness of this solution using `verify.verify`.
+    @staticmethod
+    def verify(solution_id):
+        """Verifies the correctness of the solution using `verify.verify`.
         Task is launched in a separate thread to avoid stalling the server.
         Verify threads must acquire verify_sem to avoid running too many
         verification jobs at once."""
         def thread():
-            with Solution._verify_sem:
-                self.verification = verify.verify(
-                    self.language, self.source, self.problem.test_input, 
-                    self.problem.test_output, self.problem.timeout)
             db_session = DBSession()
-            db_session.add(self)
+            solution = db_session.query(Solution).filter(
+                Solution.id == solution_id).first()
+            with Solution._verify_sem:
+                solution.verification = verify.verify(
+                    solution.language, solution.source, solution.problem.test_input, 
+                    solution.problem.test_output, solution.problem.timeout)
+            db_session.add(solution)
             db_session.commit()
             db_session.close()
 
         eventlet.spawn_n(thread)
+
+    @staticmethod
+    def exists(db_session, solution_id):
+        """Returns True if solution_id exists"""
+        solution = db_session.query(Solution).filter(Solution.id==solution_id).first()
+        return solution is not None
         
     
 class ProblemComment(Base):
@@ -155,6 +170,12 @@ class ProblemComment(Base):
     user_id = Column(String, ForeignKey('users.id'))
     submission_time = Column(DateTime, default=datetime.utcnow)
 
+    @staticmethod
+    def exists(db_session, problem_comment_id):
+        """Returns True if problem_comment_id exists"""
+        problem_comment = db_session.query(ProblemComment).filter(
+            ProblemComment.id==problem_comment_id).first()
+        return problem_comment is not None
 
 class SolutionComment(Base):
     __tablename__ = 'solution_comments'
@@ -163,6 +184,13 @@ class SolutionComment(Base):
     body = Column(String)
     user_id = Column(String, ForeignKey('users.id'))
     submission_time = Column(DateTime, default=datetime.utcnow)
+
+    @staticmethod
+    def exists(db_session, solution_comment_id):
+        """Returns True if solution_comment_id exists"""
+        solution_comment = db_session.query(SolutionComment).filter(
+            SolutionComment.id==solution_comment).first()
+        return solution_comment is not None
 
 
 Base.metadata.create_all(engine)

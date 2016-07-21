@@ -97,7 +97,7 @@ def requires_api_session(view):
         db_session = get_db_session()
         api_session_key = session.get('apiSessionKey', None)
         if api_session_key is None:
-            raise RequestError('Missing parameter(s).')
+            raise RequestError('Missing api session key')
         api_session = ApiSession.get_session(db_session, api_session_key)
         if api_session is None:
             raise AuthError('Invalid or expired session key')
@@ -198,7 +198,8 @@ def problems():
         'userId': problem.user_id,
         'submissionTime': problem.submission_time,
         'title': problem.title,
-        'prompt': problem.prompt
+        'prompt': problem.prompt,
+        'timeout': problem.timeout
     } for problem in problems.all() ]
 
     return jsonify(res)
@@ -207,20 +208,26 @@ def problems():
 @api.blueprint.route('/problems', methods=['POST'])
 @requires_api_session
 def create_problem(api_session):
+    db_session = get_db_session()
+
     # Parse form arguments
     title = request.form.get('title', None)
     prompt = request.form.get('prompt', None)
     test_input = request.form.get('testInput', '')
     test_output = request.form.get('testOutput', '')
-    timeout = request.form.get('timeout', 3)
+    timeout = int(request.form.get('timeout', 3))
+
     if title is None or prompt is None: 
         raise RequestError('Missing parameter(s).')
+    if timeout > 10:
+        raise RequestError('Timeout cannot be greater than 10 seconds.')
 
-    # Create and write resource
+    # Create problem
     problem = Problem(
         title=title, prompt=prompt, test_input=test_input, 
         test_output=test_output, timeout=timeout, user_id=api_session.user_id)
-    get_db_session().add(problem)
+    db_session.add(problem)
+    db_session.commit()
 
     # Serialize and return response body
     return jsonify({
@@ -228,7 +235,8 @@ def create_problem(api_session):
         'userId': problem.user_id,
         'submissionTime': problem.submission_time,
         'title': problem.title,
-        'prompt': problem.prompt
+        'prompt': problem.prompt,
+        'timeout': problem.timeout
     })
 
 
@@ -247,7 +255,8 @@ def problem_by_id(problem_id):
         'userId': problem.user_id,
         'submissionTime': problem.submission_time,
         'title': problem.title,
-        'prompt': problem.prompt
+        'prompt': problem.prompt,
+        'timeout': problem.timeout
     })
 
 
@@ -276,8 +285,7 @@ def update_problem(api_session, problem_id):
     problem.timeout = request.form.get('timeout', problem.timeout)
 
     return ''
-    
-    
+
 
 @api.blueprint.route('/problems/<problem_id>', methods=['DELETE'])
 @requires_api_session
@@ -296,19 +304,23 @@ def delete_problem(api_session, problem_id):
     return ''
 
 
-@api.blueprint.route('/solutions', methods=['GET'])
-def solutions():
+@api.blueprint.route('/problems/<problem_id>/solutions', methods=['GET'])
+def solutions(problem_id):
+    db_session = get_db_session()
+
+    # Verify existence of problem
+    if not Problem.exists(db_session, problem_id):
+        raise ResourceNotFound('Problem does not exists.')
+
     # Parse request args
-    problem_id = request.args.get('problemId', None)
     user_id = request.args.get('userId', None)
     language = request.args.get('language', None)
     verified_only = request.args.get('verifiedOnly', False)
     limit = request.args.get('limit', None)
 
     # Build select query
-    solutions = get_db_session().query(Solution).order_by(Solution.submission_time)
-    if problem_id:
-        solutions = solutions.filter(Solution.problem_id == problem_id)
+    solutions = db_session.query(Solution).order_by(Solution.submission_time)
+    solutions = solutions.filter(Solution.problem_id == problem_id)
     if user_id:
         solutions = solutions.filter(Solution.user_id == user_id)
     if language:
@@ -328,45 +340,46 @@ def solutions():
         'source': solution.source,
         'validation': solution.validation
     } for solution in solutions.all() ]
+
     return jsonify(res)
 
 
-@api.blueprint.route('/solutions', methods=['POST'])
+@api.blueprint.route('/problems/<problem_id>/solutions', methods=['POST'])
 @requires_api_session
-def create_solution(api_session):
+def create_solution(api_session, problem_id):
     db_session = get_db_session()
 
+    # Verify existence of problem
+    if not Problem.exists(db_session, problem_id):
+        raise ResourceNotFound('Problem does not exist')
+
     # Parse request args
-    problem_id = request.form.get('problemId', None)
     language = request.form.get('language', None)
     source = request.form.get('source', None)
-    if problem_id is None or language is None or source is None:
+    if language is None or source is None:
         raise RequestError('Missing parameter(s)')
 
-    # Check whether problem exists
-    problem = db_session.query(Problem).filter(
-        Problem.id == problem_id).first()
-    if problem is None:
-        raise RequestError('Problem does not exist.')
-    
     # Create solution
     solution = Solution(
         problem_id=problem_id, language=language, source=source, 
         user_id=api_session.user_id, verification='pending')
     db_session.add(solution)
 
+    # Commit solution before verifying
+    db_session.commit() 
+
     # Spawn solution verification thread
-    solution.verify()
+    Solution.verify(solution.id)
 
     # Serialize and return response body
     return jsonify({
         'solutionId': solution.id,
         'userId': solution.user_id,
-        'submissionTime': solusion.submission_time,
+        'submissionTime': solution.submission_time,
         'problemId': solution.problem_id,
         'language': solution.language,
         'source': solution.source,
-        'validation': solution.validation
+        'verification': solution.verification
     })
 
 
@@ -384,11 +397,11 @@ def solution_by_id(solution_id):
     return jsonify({
         'solutionId': solution.id,
         'userId': solution.user_id,
-        'submissionTime': solusion.submission_time,
+        'submissionTime': solution.submission_time,
         'problemId': solution.problem_id,
         'language': solution.language,
         'source': solution.source,
-        'validation': solution.validation
+        'verification': solution.verification
     })
 
 
@@ -409,7 +422,11 @@ def update_solution(api_session, solution_id):
 
     # Update solution
     solution.language = request.form.get('language', solution.language)
-    source = request.form.get('source', solution.source)
+    solution.source = request.form.get('source', solution.source)
+    solution.validation = 'pending'
+
+    # Spawn solution verification thread
+    solution.verify()
     
     return ''
     
@@ -437,10 +454,8 @@ def delete_solution(api_session, solution_id):
 def problem_comments(problem_id):
     db_session = get_db_session()
 
-    # Verify that problem exists
-    problem = db_session.query(Problem).filter(
-        Problem.problem_id == problem_id).first()
-    if problem is None:
+    # Verify existence of problem
+    if not Problem.exists(db_session, problem_id):
         raise ResourceNotFound('Problem does not exist.')
 
     # Create Query
@@ -466,14 +481,12 @@ def problem_comments(problem_id):
 def create_problem_comment(api_session, problem_id):
     db_session = get_db_session()
     
-    # Verify that problem exists
-    problem = db_session.query(Problem).filter(
-        Problem.problem_id == problem_id).first()
-    if problem is None:
+    # Verify existence of problem
+    if not Problem.exists(db_session, problem_id):
         raise ResourceNotFound('Problem does not exist.')
 
     # Validate form input
-    body = reqeust.form.get('Body', None)
+    body = reqeust.form.get('body', None)
     if body is None:
         raise RequestError('Missing parameter(s)')
 
@@ -557,9 +570,7 @@ def solution_comment(solution_id):
     db_session = get_db_session()
 
     # Verify that solution exists.
-    solution = db_session.query(Solution).filter(
-        Solution.id == solution_id).first()
-    if solution is None:
+    if not Solution.exists(db_session, solution_id):
         raise ResourceNotFound('Solution does not exist.')
 
     # Create query
@@ -586,9 +597,7 @@ def create_solution_comment(api_session, solution_id):
     db_session = get_db_session()
 
     # Verify that solution exists.
-    solution = db_session.query(Solution).filter(
-        Solution.id == solution_id).first()
-    if solution is None:
+    if not Solution.exists(db_session, solution_id):
         raise ResourceNotFound('Solution does not exist.')
 
     # Validate form input
