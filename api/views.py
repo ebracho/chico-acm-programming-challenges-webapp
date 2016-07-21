@@ -334,11 +334,11 @@ def solutions(problem_id):
     res = [{
         'solutionId': solution.id,
         'userId': solution.user_id,
-        'submissionTime': solusion.submission_time,
+        'submissionTime': solution.submission_time,
         'problemId': solution.problem_id,
         'language': solution.language,
         'source': solution.source,
-        'validation': solution.validation
+        'verification': solution.verification
     } for solution in solutions.all() ]
 
     return jsonify(res)
@@ -423,7 +423,7 @@ def update_solution(api_session, solution_id):
     # Update solution
     solution.language = request.form.get('language', solution.language)
     solution.source = request.form.get('source', solution.source)
-    solution.validation = 'pending'
+    solution.verification = 'pending'
 
     # Spawn solution verification thread
     solution.verify()

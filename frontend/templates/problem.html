@@ -4,11 +4,19 @@
 
 	<div id="problem"></div>
 
+	<div id="solution-list"></div>
+
 	<script type="text/babel" src="{{url_for('frontend.static', filename='problem.js')}}"></script>
+	<script type="text/babel" src="{{url_for('frontend.static', filename='solutionlist.js')}}"></script>
 	<script type="text/babel">
 		ReactDOM.render(
 			React.createElement(Riker.Problem, {problemId: {{problem_id}} }),
 			document.getElementById('problem')
+		);
+
+		ReactDOM.render(
+			React.createElement(Riker.SolutionList, {problemId: {{problem_id}}, pollInterval: 10000}),
+			document.getElementById('solution-list')
 		);
 	</script>
 
