@@ -1,0 +1,23 @@
+<form action="/register", method="post">
+  <div>
+    <label for="user-id">User Id:</label>
+    <input type="text" name="user-id" id="user-id" />
+  </div>
+  <div>
+    <label for="password">Password:</label>
+    <input type="password" name="password" id="password" />
+  </div>
+  <div>
+    <label for="confirm-password">Confirm Password:</label>
+    <input type="password" name="confirm-password" id="confirm-password" />
+  </div>
+  <div>
+    <button type="submit">Register</button>
+  </div>
+  {% if error_msg %}
+  <div>
+    <p class="error">{{ error_msg }}</p>
+  </div>
+  {% endif %}
+</form>
+

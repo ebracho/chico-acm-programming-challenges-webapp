@@ -1,0 +1,29 @@
+<form action="login" method="post">
+  <div>
+    <label for="user-id">User ID:</label>
+    <input type="text" name="user-id" id="user_id" />
+  </div>
+  <div>
+    <label for="password">Password:</label> 
+    <input type="password" name="password" id="password" />
+  </div>
+  <div>
+    <button type="submit">Login</button>
+  </div>
+  <div>
+  {% with messages = get_flashed_messages()  %}
+    {% if messages %}
+      <ul class="error-messages">
+      {% for message in messages %}
+        <li class="error">{{ message }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+  </div>
+  <div>
+    <!-- Tells server where to redirect to -->
+    <input type="hidden" name="prev" value="{{ request.args.get('prev', 'home') }}" />
+  </div>
+</form>
+

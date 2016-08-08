@@ -1,0 +1,35 @@
+<form action="/problem" method="post">
+  <div>
+    <label for="title">Title:</label>
+    <input type="text" name="title" id="title" />
+  </div>
+  <div>
+    <label for="prompt">Prompt:</label>
+    <textarea name="prompt" id="prompt" rows="4" cols="50"></textarea>
+  </div>
+  <div>
+    <label for="language">Language:</label>
+    <select name="language" id="language">
+    {% for lang in languages %}
+      <option value="{{ lang }}">{{ lang }}</option>
+    {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="timeout">Timeout:</label>
+    <select name="timeout" id="timeout">
+    {% for time in range(3,11) %}
+      <option value="{{ time }}">{{ time }}</option>
+    {% endfor %}
+    </select>
+  </div>
+  <div>
+    <button type="submit">Submit</button>
+  </div>
+  <div>
+  {% if error_msg %}
+    <p class="error">{{ error_msg }}</p>
+  {% endif %}
+  </div>
+</form>
+
