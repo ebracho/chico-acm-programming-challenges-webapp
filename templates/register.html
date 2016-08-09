@@ -14,10 +14,20 @@
   <div>
     <button type="submit">Register</button>
   </div>
-  {% if error_msg %}
   <div>
-    <p class="error">{{ error_msg }}</p>
+  {% with messages = get_flashed_messages()  %}
+    {% if messages %}
+      <ul class="error-messages">
+      {% for message in messages %}
+        <li class="error">{{ message }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
   </div>
-  {% endif %}
+  <div>
+    <!-- Tells server where to redirect to after POST -->
+    <input type="hidden" name="next" value="{{ next or request.args.get('next', '') }}" />
+  </div>
 </form>
 

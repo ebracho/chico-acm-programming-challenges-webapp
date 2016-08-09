@@ -22,8 +22,9 @@
   {% endwith %}
   </div>
   <div>
-    <!-- Tells server where to redirect to -->
-    <input type="hidden" name="prev" value="{{ request.args.get('prev', 'home') }}" />
+    <!-- Tells server where to redirect to after POST -->
+    <input type="hidden" name="next" value="{{ next or request.args.get('next', '') }}" />
   </div>
 </form>
 
+<a href="{{ url_for('register', next=(next or request.args.get('next', '')) ) }} ">Register</a>
