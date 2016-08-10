@@ -1,0 +1,7 @@
+<h2>{{ problem.title }}</h2>
+<p>Created By: <a href="{{ url_for('view_user', user_id=problem.user_id) }}">{{ problem.user_id }}</a></p>
+<p>Submission Time: {{ problem.submission_time }}</p>
+<h3>Prompt</h3>
+<p>{{ problem.prompt }}</p>
+
+

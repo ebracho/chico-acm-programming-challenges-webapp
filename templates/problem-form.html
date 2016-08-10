@@ -8,12 +8,12 @@
     <textarea name="prompt" id="prompt" rows="4" cols="50"></textarea>
   </div>
   <div>
-    <label for="language">Language:</label>
-    <select name="language" id="language">
-    {% for lang in languages %}
-      <option value="{{ lang }}">{{ lang }}</option>
-    {% endfor %}
-    </select>
+    <label for="test-input">Test Input:</label>
+    <textarea name="test-input" id="test-input" rows="4" cols="50"></textarea>
+  </div>
+  <div>
+    <label for="test_output">Test Output:</label>
+    <textarea name="test-output" id="test-output" rows="4" cols="50"></textarea>
   </div>
   <div>
     <label for="timeout">Timeout:</label>

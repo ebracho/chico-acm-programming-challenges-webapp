@@ -1,5 +1,6 @@
 from flask import Flask, request, session, render_template, redirect, url_for, g, flash
 from urllib.parse import urlparse, urljoin
+from functools import wraps
 from models import DBSession, User, Problem, Solution
 from verify import supported_languages, verify
 
@@ -46,6 +47,18 @@ def get_redirect_target(default='/'):
         if is_safe_url(target):
             return target
             
+
+def requires_login(view):
+    """Decorator for views that require login. If user is not logged in,
+    redirects to login page then redirects back after login"""
+    @wraps(view)
+    def decorator(*args, **kwargs):
+        if 'logged_in_user' not in session:
+            flash('Please login first')
+            return redirect(url_for('login', next=request.url))
+        return view(*args, **kwargs)
+    return decorator
+
 
 @app.route('/', methods=['GET'])
 def home():
@@ -125,21 +138,41 @@ def view_user(user_id):
 
 
 @app.route('/problem', methods=['GET'])
+@requires_login
 def problem_form():
-    if 'logged_in_user' not in session:
-        flash('Please login first')
-        return redirect(url_for('login', next=request.url))
-    return render_template('problem-form.html', languages=supported_languages)
+    return render_template('problem-form.html')
 
 
 @app.route('/problem', methods=['POST'])
 def create_problem():
-    pass
+    db_session = get_db_session()
+    title = request.form.get('title', None)
+    prompt = request.form.get('prompt', None)
+    test_input = request.form.get('test-input', '')
+    test_output = request.form.get('test-output', '')
+    timeout = int(request.form.get('timeout', 3))
+
+    if title is None or prompt is None:
+        flash('Missing parameter(s)')
+    elif not 1 <= timeout <= 10:
+        flash('Timeout must be between 1 and 10 seconds')
+    else:
+        problem = Problem(
+            title=title, prompt=prompt, test_input=test_input,
+            test_output=test_output, timeout=timeout, 
+            user_id=session['logged_in_user'])
+        db_session.add(problem)
+    
+    return render_template('problem-form.html')
 
 
 @app.route('/problem/<problem_id>', methods=['GET'])
-def view_problem():
-    pass
+def view_problem(problem_id):
+    db_session = get_db_session()
+    problem = db_session.query(Problem).filter(problem_id==problem_id).first()
+    if problem is None:
+        abort(404)
+    return render_template('view-problem.html', problem=problem)
 
 
 @app.route('/problem/<problem_id>', methods=['DELETE'])
