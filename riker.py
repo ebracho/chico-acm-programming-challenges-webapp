@@ -1,4 +1,5 @@
-from flask import Flask, request, session, render_template, redirect, url_for, g, flash
+from flask import Flask, request, session, render_template, redirect, \
+                  url_for, g, flash, abort
 from urllib.parse import urlparse, urljoin
 from functools import wraps
 from models import DBSession, User, Problem, Solution
@@ -62,7 +63,9 @@ def requires_login(view):
 
 @app.route('/', methods=['GET'])
 def home():
-    return render_template('home.html')
+    db_session = get_db_session()
+    problems = db_session.query(Problem).all()
+    return render_template('home.html', problems=problems)
         
 
 @app.route('/register', methods=['GET'])
@@ -134,7 +137,9 @@ def logout():
 
 @app.route('/user/<user_id>', methods=['GET'])
 def view_user(user_id):
-    return render_template('user.html', user_id=user_id)
+    db_session = get_db_session()
+    problems = db_session.query(Problem).filter(Problem.user_id==user_id).all()
+    return render_template('user.html', user_id=user_id, problems=problems)
 
 
 @app.route('/problem', methods=['GET'])
@@ -154,14 +159,16 @@ def create_problem():
 
     if title is None or prompt is None:
         flash('Missing parameter(s)')
-    elif not 1 <= timeout <= 10:
-        flash('Timeout must be between 1 and 10 seconds')
+    elif not 3 <= timeout <= 10:
+        flash('Timeout must be between 3 and 10 seconds')
     else:
         problem = Problem(
             title=title, prompt=prompt, test_input=test_input,
             test_output=test_output, timeout=timeout, 
             user_id=session['logged_in_user'])
         db_session.add(problem)
+        db_session.commit()
+        return redirect(url_for('view_problem', problem_id=problem.id))
     
     return render_template('problem-form.html')
 
@@ -169,7 +176,7 @@ def create_problem():
 @app.route('/problem/<problem_id>', methods=['GET'])
 def view_problem(problem_id):
     db_session = get_db_session()
-    problem = db_session.query(Problem).filter(problem_id==problem_id).first()
+    problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
     if problem is None:
         abort(404)
     return render_template('view-problem.html', problem=problem)

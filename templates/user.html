@@ -1,1 +1,11 @@
-<h3>Overview for <u>{{ user_id }}</u>.</h3>
+<h2>Overview for <u>{{ user_id }}</u>.</h2>
+
+<h3>Problems</h3>
+<ul>
+{% for problem in problems %}
+  <li><a href="{{ url_for('view_problem', problem_id=problem.id) }}">{{ problem.title }}</a></li>
+{% else %}
+  <li>No problems found</li>
+{% endfor %}
+</ul>
+
