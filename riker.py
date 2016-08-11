@@ -139,7 +139,8 @@ def logout():
 def view_user(user_id):
     db_session = get_db_session()
     problems = db_session.query(Problem).filter(Problem.user_id==user_id).all()
-    return render_template('user.html', user_id=user_id, problems=problems)
+    solutions = db_session.query(Solution).filter(Solution.user_id==user_id).all()
+    return render_template('user.html', user_id=user_id, problems=problems, solutions=solutions)
 
 
 @app.route('/problem', methods=['GET'])
@@ -179,9 +180,10 @@ def create_problem():
 def view_problem(problem_id):
     db_session = get_db_session()
     problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
+    solutions = db_session.query(Solution).filter(problem_id==problem_id).order_by(Solution.submission_time).all()
     if problem is None:
         abort(404)
-    return render_template('view-problem.html', problem=problem)
+    return render_template('view-problem.html', problem=problem, solutions=solutions)
 
 
 @app.route('/problem/<problem_id>', methods=['DELETE'])

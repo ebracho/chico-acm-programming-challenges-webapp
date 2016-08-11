@@ -3,5 +3,18 @@
 <p>Submission Time: {{ problem.submission_time }}</p>
 <h3>Prompt</h3>
 <p>{{ problem.prompt }}</p>
+<div>
+  <h3>Solutions</h3>
+  <ul>
+  {% for solution in solutions %}
+    <li><a href="{{ url_for('view_solution', problem_id=problem.id, solution_id=solution.id) }}">{{ solution.user_id }}</a></li>
+  {% else %}
+    <li>No solutions found</li>
+  {% endfor %}
+  </ul>
+</div>
+<div>
+  <h3><a href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a></h3>
+</div>
 
 
