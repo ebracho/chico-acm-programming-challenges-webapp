@@ -1,0 +1,11 @@
+<h2>Solution for <a href="{{ url_for('view_problem', problem_id=solution.problem_id) }}">{{ problem.title }}</a></h2>
+<p>Submitted by: <a href="{{ url_for('view_user', user_id=solution.user_id) }}">{{ solution.user_id }}</a></p>
+<p>Submission time: {{ solution.submission_time }}</p>
+<p>Language: {{ solution.language }}</p>
+<h3>Source</h3>
+<div>
+<pre><code>
+{{ solution.source }}
+</code></pre>
+</div>
+

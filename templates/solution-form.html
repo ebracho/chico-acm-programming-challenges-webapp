@@ -1,0 +1,20 @@
+<h2>{{ problem.title }}</h2>
+<p>{{ problem.prompt }}</p>
+<br/>
+<h3>Your Solution</h3>
+<form action="{{ url_for('create_solution', problem_id=problem.id) }}" method="post">
+  <div>
+    <textarea name="source" id="source" rows="20" cols="80"></textarea>
+  </div>
+  <div>
+    <select name="language" id="language">
+    {% for language in supported_languages %}
+      <option value="{{ language }}">{{ language }}</option>
+    {% endfor %}
+    </select>
+  </div>
+  <div>
+    <button type="submit">Submit</button>
+  </div>
+</form>
+

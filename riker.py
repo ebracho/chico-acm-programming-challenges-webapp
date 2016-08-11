@@ -157,6 +157,8 @@ def create_problem():
     test_output = request.form.get('test-output', '')
     timeout = int(request.form.get('timeout', 3))
 
+    if not 'logged_in_user' in session:
+        abort(401)
     if title is None or prompt is None:
         flash('Missing parameter(s)')
     elif not 3 <= timeout <= 10:
@@ -188,18 +190,52 @@ def delete_problem():
 
 
 @app.route('/problem/<problem_id>/solution', methods=['GET'])
+@requires_login
 def solution_form(problem_id):
-    pass
+    db_session = get_db_session()
+    problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
+    if problem is None:
+        abort(404)
+    return render_template(
+        'solution-form.html', problem=problem, 
+        supported_languages=supported_languages)
 
 
 @app.route('/problem/<problem_id>/solution', methods=['POST'])
 def create_solution(problem_id):
-    pass
+    db_session = get_db_session()
+    problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
+    if problem is None:
+        abort(404)
+    if not 'logged_in_user' in session:
+        abort(401)
+    
+    source = request.form.get('source', None)
+    language = request.form.get('language', None)
+    if source is None or language is None:
+        flash('Missing parameter(s)')
+    elif language not in supported_languages:
+        flash('Language not supported')
+    else:
+        solution = Solution(
+            problem_id=problem_id, user_id=session['logged_in_user'], 
+            language=language, source=source, verification='pending')
+        db_session.add(solution)
+        db_session.commit()
+        return redirect(url_for('view_solution', problem_id=problem_id, solution_id=solution.id))
+
+    return redirect(url_for('solution_form', problem_id=problem_id))
+    
 
 
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['GET'])
 def view_solution(problem_id, solution_id):
-    pass
+    db_session = get_db_session()
+    solution = db_session.query(Solution).filter(Solution.id==solution_id).first()
+    if solution is None:
+        abort(404)
+    return render_template(
+        'view-solution.html', problem=solution.problem, solution=solution)
 
 
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['DELETE'])
