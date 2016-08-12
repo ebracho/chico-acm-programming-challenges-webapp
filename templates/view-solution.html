@@ -4,8 +4,10 @@
 <p>Language: {{ solution.language }}</p>
 <h3>Source</h3>
 <div>
-<pre><code>
-{{ solution.source }}
-</code></pre>
+<pre><code class="{{ solution.language }}">{{ solution.source }}</code></pre>
 </div>
+
+<link rel="stylesheet" href="/static/highlight/styles/default.css" />
+<script src="/static/highlight/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
 
