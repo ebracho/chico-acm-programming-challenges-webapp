@@ -180,7 +180,7 @@ def create_problem():
 def view_problem(problem_id):
     db_session = get_db_session()
     problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
-    solutions = db_session.query(Solution).filter(problem_id==problem_id).order_by(Solution.submission_time).all()
+    solutions = db_session.query(Solution).filter(Solution.problem_id==problem_id).order_by(Solution.submission_time).all()
     if problem is None:
         abort(404)
     return render_template('view-problem.html', problem=problem, solutions=solutions)
@@ -212,13 +212,14 @@ def create_solution(problem_id):
     if not 'logged_in_user' in session:
         abort(401)
     
-    source = request.form.get('source', None)
+    source_file = request.files.get('source-file', None)
     language = request.form.get('language', None)
-    if source is None or language is None:
+    if source_file is None or language is None:
         flash('Missing parameter(s)')
     elif language not in supported_languages:
         flash('Language not supported')
     else:
+        source = source_file.read().decode('utf-8')
         solution = Solution(
             problem_id=problem_id, user_id=session['logged_in_user'], 
             language=language, source=source, verification='pending')

@@ -2,9 +2,9 @@
 <p>{{ problem.prompt }}</p>
 <br/>
 <h3>Your Solution</h3>
-<form action="{{ url_for('create_solution', problem_id=problem.id) }}" method="post">
+<form action="{{ url_for('create_solution', problem_id=problem.id) }}" method="post" enctype="multipart/form-data" >
   <div>
-    <textarea name="source" id="source" rows="20" cols="80"></textarea>
+    <input type="file" id="source-file" name="source-file" />
   </div>
   <div>
     <select name="language" id="language">
@@ -17,4 +17,14 @@
     <button type="submit">Submit</button>
   </div>
 </form>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class="error-messages">
+    {% for message in messages %}
+      <li class="error">{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
 
