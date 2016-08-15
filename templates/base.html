@@ -3,6 +3,18 @@
   <link rel="stylesheet" type="text/css" href="/static/style.css"/>
 </head>
 <body>
+    <!-- navbar -->
+    <ul id="navbar">
+        <li><a href="{{ url_for('home') }}">Home</a></li>
+        <li><a href="{{ url_for('problem_form') }}">Create Problem</a></li>
+        {% if 'logged_in_user' in session %}
+            <li><a href="{{ url_for('view_user', user_id=session['logged_in_user']) }}">{{ session['logged_in_user'] }}</a></li>
+            <li><form action="{{ url_for('logout') }}" method="post"><button type="submit">Logout</button></form></li>
+        {% else %}
+            <li><a href="{{ url_for('login') }}">Login</a></li>
+            <li><a href="{{ url_for('register') }}">Register</a></li>
+        {% endif %}
+    </ul>
 {% block body %}
 {% endblock %}
 </body>
