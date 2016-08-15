@@ -229,6 +229,7 @@ def view_problem(problem_id):
 
 
 @app.route('/problem/<problem_id>', methods=['DELETE'])
+@requires_login
 def delete_problem():
     pass
 
@@ -268,7 +269,6 @@ def create_solution(problem_id):
     elif language not in supported_languages:
         flash('Language not supported')
     else:
-        source = source_file.read().decode('utf-8')
         solution = Solution(
             problem_id=problem_id, user_id=session['logged_in_user'], 
             language=language, source=source_file.read().decode('utf-8'), 
@@ -303,9 +303,21 @@ def view_solution(problem_id, solution_id):
         comments=comments)
 
 
-@app.route('/problem/<problem_id>/solution/<solution_id>', methods=['DELETE'])
+@app.route('/problem/<problem_id>/solution/<solution_id>', methods=['POST']) # html forms don't support delete
+@requires_login
 def delete_solution(problem_id, solution_id):
-    pass
+    db_session = get_db_session()
+    solution = (
+        db_session.query(Solution)
+        .filter(Solution.id == solution_id)
+        .first()
+    )
+    if solution is None:
+        abort(404)
+    elif solution.user_id != session['logged_in_user']:
+        abort(401)
+    db_session.delete(solution)
+    return redirect(url_for('home'))
 
 
 @app.route('/problem/<problem_id>/comment', methods=['POST'])
@@ -328,7 +340,7 @@ def create_problem_comment(problem_id):
     return redirect(url_for('view_problem', problem_id=problem_id))
     
 
-@app.route('/problem-comment/<comment_id>/', methods=['POST']) # http forms don't support delete
+@app.route('/problem-comment/<comment_id>/', methods=['POST']) # html forms don't support delete
 @requires_login
 def delete_problem_comment(comment_id):
     db_session = get_db_session()
