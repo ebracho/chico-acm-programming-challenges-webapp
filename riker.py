@@ -228,10 +228,29 @@ def view_problem(problem_id):
     return render_template('view-problem.html', problem=problem, solutions=solutions, comments=comments)
 
 
-@app.route('/problem/<problem_id>', methods=['DELETE'])
+@app.route('/problem/<problem_id>', methods=['POST']) # html forms don't support delete
 @requires_login
-def delete_problem():
-    pass
+def delete_problem(problem_id):
+    """Deletes problem and all associated solutions form database"""
+    db_session = get_db_session()
+    problem = (
+        db_session.query(Problem)
+        .filter(Problem.id == problem_id)
+        .first()
+    )
+    if problem is None:
+        abort(404)
+    elif problem.user_id != session['logged_in_user']:
+        abort(401)
+    solutions = (
+        db_session.query(Solution)
+        .filter(Solution.problem_id == problem_id)
+        .all()
+    )
+    db_session.delete(problem)
+    for solution in solutions:
+        db_session.delete(solution)
+    return redirect(url_for('home'))
 
 
 @app.route('/problem/<problem_id>/solution', methods=['GET'])

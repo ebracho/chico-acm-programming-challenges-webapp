@@ -10,6 +10,11 @@
 <div class="prompt">
     <p>{{ problem.prompt | markdown(no_html=True) }}</p>
 </div>
+{% if problem.user_id == session.get('logged_in_user', None) %}
+    <form action="{{ url_for('delete_problem', problem_id=problem.id) }}" method="post">
+        <button type="submit">Delete Problem</button>
+    </form>
+{% endif %}
 
 <div>
   <h3><a href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a></h3>
