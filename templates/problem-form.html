@@ -1,4 +1,4 @@
-<form action="/problem" method="post">
+<form action="/problem" method="post" enctype="multipart/form-data">
   <div>
     <label for="title">Title:</label>
     <input type="text" name="title" id="title" />
@@ -9,11 +9,11 @@
   </div>
   <div>
     <label for="test-input">Test Input:</label>
-    <textarea name="test-input" id="test-input" rows="4" cols="50"></textarea>
+    <input type="file" name="test-inpu-filet" id="test-input-file" />
   </div>
   <div>
     <label for="test_output">Test Output:</label>
-    <textarea name="test-output" id="test-output" rows="4" cols="50"></textarea>
+    <input type="file" name="test-output-file" id="test-output-file" />
   </div>
   <div>
     <label for="timeout">Timeout:</label>

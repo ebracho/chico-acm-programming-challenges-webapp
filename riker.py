@@ -1,14 +1,22 @@
 from flask import Flask, request, session, render_template, redirect, \
                   url_for, g, flash, abort
+from flask_misaka import Misaka
 from urllib.parse import urlparse, urljoin
 from functools import wraps
-from models import DBSession, User, Problem, Solution
+from models import DBSession, User, Problem, Solution, ProblemComment, SolutionComment
 from verify import supported_languages, verify
 
 
+
 app = Flask(__name__)
+Misaka(app) # Load Misaka extension (used for jinja2 markdown filter)
 app.secret_key = 'development_key'
 
+
+
+#############################
+### View Helper Functions
+#############################
 
 def get_db_session():
     """Opens a new database session if there is not already one for the
@@ -40,6 +48,7 @@ def is_safe_url(target):
 
 
 def get_redirect_target(default='/'):
+    """Attempts to find redirect target in request."""
     arg_next = request.args.get('next', None)
     form_next = request.form.get('next', None)
     for target in arg_next, form_next, default:
@@ -60,6 +69,11 @@ def requires_login(view):
         return view(*args, **kwargs)
     return decorator
 
+
+
+#############################
+### Views
+#############################
 
 @app.route('/', methods=['GET'])
 def home():
@@ -138,9 +152,18 @@ def logout():
 @app.route('/user/<user_id>', methods=['GET'])
 def view_user(user_id):
     db_session = get_db_session()
-    problems = db_session.query(Problem).filter(Problem.user_id==user_id).all()
-    solutions = db_session.query(Solution).filter(Solution.user_id==user_id).all()
-    return render_template('user.html', user_id=user_id, problems=problems, solutions=solutions)
+    problems = (
+        db_session.query(Problem)
+        .filter(Problem.user_id==user_id)
+        .all()
+    )
+    solutions = (
+        db_session.query(Solution)
+        .filter(Solution.user_id==user_id)
+        .all()
+    )
+    return render_template(
+        'user.html', user_id=user_id, problems=problems, solutions=solutions)
 
 
 @app.route('/problem', methods=['GET'])
@@ -154,21 +177,22 @@ def create_problem():
     db_session = get_db_session()
     title = request.form.get('title', None)
     prompt = request.form.get('prompt', None)
-    test_input = request.form.get('test-input', '')
-    test_output = request.form.get('test-output', '')
+    test_input_file = request.file.get('test-input-file', None)
+    test_output_file = request.file.get('test-output-file', None)
     timeout = int(request.form.get('timeout', 3))
 
     if not 'logged_in_user' in session:
         abort(401)
-    if title is None or prompt is None:
+    elif None in [title, prompt, test_input_file, test_output_file]:
         flash('Missing parameter(s)')
     elif not 3 <= timeout <= 10:
         flash('Timeout must be between 3 and 10 seconds')
     else:
         problem = Problem(
-            title=title, prompt=prompt, test_input=test_input,
-            test_output=test_output, timeout=timeout, 
-            user_id=session['logged_in_user'])
+            title=title, prompt=prompt, 
+            test_input=test_input_file.read().decode('utf-8'),
+            test_output=test_output_file.read().decode('utf-8'), 
+            timeout=timeout, user_id=session['logged_in_user'])
         db_session.add(problem)
         db_session.commit()
         return redirect(url_for('view_problem', problem_id=problem.id))
@@ -179,11 +203,26 @@ def create_problem():
 @app.route('/problem/<problem_id>', methods=['GET'])
 def view_problem(problem_id):
     db_session = get_db_session()
-    problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
-    solutions = db_session.query(Solution).filter(Solution.problem_id==problem_id).order_by(Solution.submission_time).all()
+    problem = (
+        db_session.query(Problem)
+        .filter(Problem.id==problem_id)
+        .first()
+    )
+    solutions = (
+        db_session.query(Solution)
+        .filter(Solution.problem_id==problem_id)
+        .order_by(Solution.submission_time)
+        .all()
+    )
+    comments = (
+        db_session.query(ProblemComment)
+        .filter(ProblemComment.problem_id==problem_id)
+        .order_by(ProblemComment.submission_time)
+        .all()
+    )
     if problem is None:
         abort(404)
-    return render_template('view-problem.html', problem=problem, solutions=solutions)
+    return render_template('view-problem.html', problem=problem, solutions=solutions, comments=comments)
 
 
 @app.route('/problem/<problem_id>', methods=['DELETE'])
@@ -206,7 +245,11 @@ def solution_form(problem_id):
 @app.route('/problem/<problem_id>/solution', methods=['POST'])
 def create_solution(problem_id):
     db_session = get_db_session()
-    problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
+    problem = (
+        db_session.query(Problem)
+        .filter(Problem.id==problem_id)
+        .first()
+    )
     if problem is None:
         abort(404)
     if not 'logged_in_user' in session:
@@ -244,6 +287,31 @@ def view_solution(problem_id, solution_id):
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['DELETE'])
 def delete_solution(problem_id, solution_id):
     pass
+
+
+@app.route('/problem/<problem_id>/comment', methods=['POST'])
+@requires_login
+def create_problem_comment(problem_id):
+    db_session = get_db_session()
+    if not Problem.exists(db_session, problem_id):
+        abort(404)
+    body = request.form.get('body', None)
+    if body is None:
+        abort(400)
+    comment = ProblemComment(problem_id=problem_id, user_id=session['logged_in_user'], body=body)
+    db_session.add(comment)
+    return redirect(url_for('view_problem', problem_id=problem_id))
+    
+
+
+#############################
+### Jinja2 Template Filters
+#############################
+
+@app.template_filter('datetime')
+def format_datetime(value):
+    return value.strftime('%a %b %d %Y')
+
 
 
 app.run(host='0.0.0.0')

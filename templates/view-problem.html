@@ -1,8 +1,20 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+
 <h2>{{ problem.title }}</h2>
 <p>Created By: <a href="{{ url_for('view_user', user_id=problem.user_id) }}">{{ problem.user_id }}</a></p>
-<p>Submission Time: {{ problem.submission_time }}</p>
+<p>Submission Time: <em>{{ problem.submission_time | datetime }}</em></p>
 <h3>Prompt</h3>
 <p>{{ problem.prompt }}</p>
+
+<div>
+  <h3><a href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a></h3>
+</div>
+
+<hr/>
+
 <div>
   <h3>Solutions</h3>
   <ul>
@@ -13,8 +25,31 @@
   {% endfor %}
   </ul>
 </div>
+
+<hr/>
+
 <div>
-  <h3><a href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a></h3>
+  <h3>Comments</h3>
+  {% for comment in comments %}
+    <div class="comment">
+      <a href="{{ url_for('view_user', user_id=comment.user_id) }}">{{ comment.user_id }}</a> - <em>{{ comment.submission_time | datetime }}</em>
+      {{ comment.body | markdown(no_html=True) }}
+    </div>
+  {% else %}
+  {% endfor %}
+</div>
+
+<div>
+  {% if 'logged_in_user' in session %}
+    <h3>Submit Comment</h3>
+    <form action="{{ url_for('create_problem_comment', problem_id=problem.id) }}" method="post" >
+      <textarea name="body" rows="4" cols="50"></textarea>
+      <button type="submit">Submit</button>
+    </form>
+  {% else %}
+    <p><a href="{{ url_for('login', next=request.url) }}">Login</a> to submit a comment</p>
+  {% endif %}
 </div>
 
 
+{% endblock %}
