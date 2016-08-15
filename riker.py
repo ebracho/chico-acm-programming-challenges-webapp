@@ -208,6 +208,8 @@ def view_problem(problem_id):
         .filter(Problem.id==problem_id)
         .first()
     )
+    if problem is None:
+        abort(404)
     solutions = (
         db_session.query(Solution)
         .filter(Solution.problem_id==problem_id)
@@ -220,8 +222,6 @@ def view_problem(problem_id):
         .order_by(ProblemComment.submission_time)
         .all()
     )
-    if problem is None:
-        abort(404)
     return render_template('view-problem.html', problem=problem, solutions=solutions, comments=comments)
 
 
@@ -234,7 +234,11 @@ def delete_problem():
 @requires_login
 def solution_form(problem_id):
     db_session = get_db_session()
-    problem = db_session.query(Problem).filter(Problem.id==problem_id).first()
+    problem = (
+        db_session.query(Problem)
+        .filter(Problem.id==problem_id)
+        .first()
+    )
     if problem is None:
         abort(404)
     return render_template(
@@ -243,6 +247,7 @@ def solution_form(problem_id):
 
 
 @app.route('/problem/<problem_id>/solution', methods=['POST'])
+@requires_login
 def create_solution(problem_id):
     db_session = get_db_session()
     problem = (
@@ -252,8 +257,6 @@ def create_solution(problem_id):
     )
     if problem is None:
         abort(404)
-    if not 'logged_in_user' in session:
-        abort(401)
     
     source_file = request.files.get('source-file', None)
     language = request.form.get('language', None)
@@ -265,10 +268,12 @@ def create_solution(problem_id):
         source = source_file.read().decode('utf-8')
         solution = Solution(
             problem_id=problem_id, user_id=session['logged_in_user'], 
-            language=language, source=source, verification='pending')
+            language=language, source=source_file.read().decode('utf-8'), 
+            verification='pending')
         db_session.add(solution)
         db_session.commit()
-        return redirect(url_for('view_solution', problem_id=problem_id, solution_id=solution.id))
+        return redirect(url_for(
+            'view_solution', problem_id=problem_id, solution_id=solution.id))
 
     return redirect(url_for('solution_form', problem_id=problem_id))
     
@@ -277,11 +282,22 @@ def create_solution(problem_id):
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['GET'])
 def view_solution(problem_id, solution_id):
     db_session = get_db_session()
-    solution = db_session.query(Solution).filter(Solution.id==solution_id).first()
+    solution = (
+        db_session.query(Solution)
+        .filter(Solution.id==solution_id)
+        .first()
+    )
     if solution is None:
         abort(404)
+    comments = (
+        db_session.query(SolutionComment)
+        .filter(SolutionComment.solution_id==solution_id)
+        .order_by(SolutionComment.submission_time)
+        .all()
+    )
     return render_template(
-        'view-solution.html', problem=solution.problem, solution=solution)
+        'view-solution.html', problem=solution.problem, solution=solution, 
+        comments=comments)
 
 
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['DELETE'])
@@ -293,14 +309,43 @@ def delete_solution(problem_id, solution_id):
 @requires_login
 def create_problem_comment(problem_id):
     db_session = get_db_session()
+    body = request.form.get('body', None)
+
     if not Problem.exists(db_session, problem_id):
         abort(404)
-    body = request.form.get('body', None)
-    if body is None:
+    elif body is None:
         abort(400)
-    comment = ProblemComment(problem_id=problem_id, user_id=session['logged_in_user'], body=body)
-    db_session.add(comment)
+    elif body == '':
+        flash('Comment body cannot be empty')
+    else:
+        comment = ProblemComment(
+            problem_id=problem_id, user_id=session['logged_in_user'], body=body)
+        db_session.add(comment)
+
     return redirect(url_for('view_problem', problem_id=problem_id))
+    
+
+@app.route('/problem/<problem_id>/solution/<solution_id>/comment', methods=['POST'])
+@requires_login
+def create_solution_comment(problem_id, solution_id):
+    db_session = get_db_session()
+    body = request.form.get('body', None)
+
+    if not Problem.exists(db_session, problem_id):
+        abort(404)
+    elif not Solution.exists(db_session, solution_id):
+        abort(404)
+    elif body is None:
+        abort(400)
+    elif body == '':
+        flash('Comment body cannot be empty')
+    else:
+        comment = SolutionComment(
+            solution_id=solution_id, user_id=session['logged_in_user'], body=body)
+        db_session.add(comment)
+
+    return redirect(url_for(
+        'view_solution', problem_id=problem_id, solution_id=solution_id))
     
 
 

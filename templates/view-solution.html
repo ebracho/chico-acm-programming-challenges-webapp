@@ -1,3 +1,8 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+
 <h2>Solution for <a href="{{ url_for('view_problem', problem_id=solution.problem_id) }}">{{ problem.title }}</a></h2>
 <p>Submitted by: <a href="{{ url_for('view_user', user_id=solution.user_id) }}">{{ solution.user_id }}</a></p>
 <p>Submission time: {{ solution.submission_time }}</p>
@@ -7,7 +12,33 @@
 <pre><code class="{{ solution.language }}">{{ solution.source }}</code></pre>
 </div>
 
+<div>
+  <h3>Comments</h3>
+  {% for comment in comments %}
+    <div class="comment">
+      <a href="{{ url_for('view_user', user_id=comment.user_id) }}">{{ comment.user_id }}</a> - <em>{{ comment.submission_time | datetime }}</em>
+      {{ comment.body | markdown(no_html=True) }}
+    </div>
+  {% else %}
+  <p>No comments found.</p>
+  {% endfor %}
+</div>
+
+<div>
+  {% if 'logged_in_user' in session %}
+    <h3>Submit Comment</h3>
+    <form action="{{ url_for('create_solution_comment', problem_id=problem.id, solution_id=solution.id) }}" method="post" >
+      <textarea name="body" rows="4" cols="50"></textarea>
+      <button type="submit">Submit</button>
+    </form>
+  {% else %}
+    <p><a href="{{ url_for('login', next=request.url) }}">Login</a> to submit a comment</p>
+  {% endif %}
+</div>
+
 <link rel="stylesheet" href="/static/highlight/styles/default.css" />
 <script src="/static/highlight/highlight.pack.js"></script>
 <script>hljs.initHighlightingOnLoad()</script>
 
+
+{% endblock %}
