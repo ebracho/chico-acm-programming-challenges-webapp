@@ -1,3 +1,8 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+
 <form action="/problem" method="post" enctype="multipart/form-data">
   <div>
     <label for="title">Title:</label>
@@ -9,10 +14,10 @@
   </div>
   <div>
     <label for="test-input">Test Input:</label>
-    <input type="file" name="test-inpu-filet" id="test-input-file" />
+    <input type="file" name="test-input-file" id="test-input-file" />
   </div>
   <div>
-    <label for="test_output">Test Output:</label>
+    <label for="test-output">Test Output:</label>
     <input type="file" name="test-output-file" id="test-output-file" />
   </div>
   <div>
@@ -26,10 +31,18 @@
   <div>
     <button type="submit">Submit</button>
   </div>
-  <div>
-  {% if error_msg %}
-    <p class="error">{{ error_msg }}</p>
-  {% endif %}
+  {% with messages = get_flashed_messages()  %}
+    {% if messages %}
+      <ul class="error-messages">
+      {% for message in messages %}
+        <li class="error">{{ message }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
   </div>
 </form>
+
+
+{% endblock %}
 

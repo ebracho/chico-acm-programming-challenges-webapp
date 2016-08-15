@@ -7,7 +7,9 @@
 <p>Created By: <a href="{{ url_for('view_user', user_id=problem.user_id) }}">{{ problem.user_id }}</a></p>
 <p>Submission Time: <em>{{ problem.submission_time | datetime }}</em></p>
 <h3>Prompt</h3>
-<p>{{ problem.prompt }}</p>
+<div class="prompt">
+    <p>{{ problem.prompt | markdown(no_html=True) }}</p>
+</div>
 
 <div>
   <h3><a href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a></h3>
@@ -34,6 +36,9 @@
     <div class="comment">
       <a href="{{ url_for('view_user', user_id=comment.user_id) }}">{{ comment.user_id }}</a> - <em>{{ comment.submission_time | datetime }}</em>
       {{ comment.body | markdown(no_html=True) }}
+      {% if session['logged_in_user'] == comment.user_id %}
+        <form action="{{ url_for('delete_problem_comment', comment_id=comment.id) }}" method="post"><button type="submit">Delete</button></form>
+      {% endif %}
     </div>
   {% else %}
   {% endfor %}

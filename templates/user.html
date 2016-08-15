@@ -1,5 +1,9 @@
-<h2>Overview for <u>{{ user_id }}</u>.</h2>
+{% extends "base.html" %}
 
+{% block body %}
+
+
+<h2>Overview for <u>{{ user_id }}</u>.</h2>
 
 <div>
   <h3>Problems</h3>
@@ -22,3 +26,7 @@
   {% endfor %}
   </ul>
 </div>
+
+
+{% endblock %}
+

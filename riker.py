@@ -177,13 +177,16 @@ def create_problem():
     db_session = get_db_session()
     title = request.form.get('title', None)
     prompt = request.form.get('prompt', None)
-    test_input_file = request.file.get('test-input-file', None)
-    test_output_file = request.file.get('test-output-file', None)
+    test_input_file = request.files.get('test-input-file', None)
+    test_output_file = request.files.get('test-output-file', None)
     timeout = int(request.form.get('timeout', 3))
+
+    print(request.files)
 
     if not 'logged_in_user' in session:
         abort(401)
     elif None in [title, prompt, test_input_file, test_output_file]:
+        print(title, prompt, test_input_file, test_output_file)
         flash('Missing parameter(s)')
     elif not 3 <= timeout <= 10:
         flash('Timeout must be between 3 and 10 seconds')
@@ -325,6 +328,25 @@ def create_problem_comment(problem_id):
     return redirect(url_for('view_problem', problem_id=problem_id))
     
 
+@app.route('/problem-comment/<comment_id>/', methods=['POST']) # http forms don't support delete
+@requires_login
+def delete_problem_comment(comment_id):
+    db_session = get_db_session()
+    comment = (
+        db_session.query(ProblemComment)
+        .filter(ProblemComment.id == comment_id)
+        .first()
+    )
+    if comment is None:
+        abort(404)
+    if comment.user_id != session['logged_in_user']:
+        abort(401)
+
+    problem_id = comment.problem_id
+    db_session.delete(comment)
+    return redirect(url_for('view_problem', problem_id=problem_id))
+
+
 @app.route('/problem/<problem_id>/solution/<solution_id>/comment', methods=['POST'])
 @requires_login
 def create_solution_comment(problem_id, solution_id):
@@ -347,6 +369,32 @@ def create_solution_comment(problem_id, solution_id):
     return redirect(url_for(
         'view_solution', problem_id=problem_id, solution_id=solution_id))
     
+
+@app.route('/solution-comment/<comment_id>/delete', methods=['POST']) # html form don't support DELETE
+@requires_login
+def delete_solution_comment(comment_id):
+    db_session = get_db_session()
+    comment = (
+        db_session.query(SolutionComment)
+        .filter(SolutionComment.id == comment_id)
+        .first()
+    )
+    if comment is None:
+        abort(404)
+    if comment.user_id != session['logged_in_user']:
+        abort(401)
+
+    solution_id = comment.solution_id
+    problem_id = (
+        db_session.query(Solution)
+        .filter(Solution.id==solution_id)
+        .first()
+        .problem_id
+    )
+    db_session.delete(comment)
+    return redirect(url_for(
+        'view_solution', problem_id=problem_id, solution_id=solution_id))
+
 
 
 #############################

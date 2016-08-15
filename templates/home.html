@@ -1,3 +1,8 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+
 <h1>Welcome</h1>
 
 {% if session.logged_in_user %}
@@ -17,3 +22,7 @@
   <li>No problems found</li>
 {% endfor %}
 </ul>
+
+
+{% endblock %}
+
