@@ -134,9 +134,12 @@ class Solution(Base):
 
     problem = relationship('Problem')
 
+    def verify(self):
+        Solution._verify(self.id)
+
     _verify_sem = eventlet.semaphore.Semaphore(4)
     @staticmethod
-    def verify(solution_id):
+    def _verify(solution_id):
         """Verifies the correctness of the solution using `verify.verify`.
         Task is launched in a separate thread to avoid stalling the server.
         Verify threads must acquire verify_sem to avoid running too many
@@ -145,9 +148,6 @@ class Solution(Base):
             db_session = DBSession()
             solution = db_session.query(Solution).filter(
                 Solution.id == solution_id).first()
-
-            print(solution.problem.timeout)
-
             with Solution._verify_sem:
                 solution.verification = verify.verify(
                     solution.language, solution.source, solution.problem.test_input, 

@@ -193,8 +193,8 @@ def create_problem():
     else:
         problem = Problem(
             title=title, prompt=prompt, 
-            test_input=test_input_file.read().decode('utf-8'),
-            test_output=test_output_file.read().decode('utf-8'), 
+            test_input=test_input_file.read().decode('utf-8')[:-1], # remove trailing newline
+            test_output=test_output_file.read().decode('utf-8')[:-1], # remove trailing newline 
             timeout=timeout, user_id=session['logged_in_user'])
         db_session.add(problem)
         db_session.commit()
@@ -294,6 +294,7 @@ def create_solution(problem_id):
             verification='pending')
         db_session.add(solution)
         db_session.commit()
+        solution.verify() # Launch verification thread
         return redirect(url_for(
             'view_solution', problem_id=problem_id, solution_id=solution.id))
 
@@ -437,6 +438,5 @@ def format_datetime(value):
     return value.strftime('%a %b %d %Y')
 
 
-
-app.run(host='0.0.0.0')
+app.run(host='0.0.0.0', port=80)
 
