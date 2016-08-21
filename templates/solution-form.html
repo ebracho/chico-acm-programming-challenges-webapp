@@ -13,9 +13,9 @@
   </div>
   <div>
     <select name="language" id="language">
-    {% for language in supported_languages %}
+      {% for language in supported_languages %}
       <option value="{{ language }}">{{ language }}</option>
-    {% endfor %}
+      {% endfor %}
     </select>
   </div>
   <div>
@@ -24,13 +24,13 @@
 </form>
 
 {% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <ul class="error-messages">
-    {% for message in messages %}
-      <li class="error">{{ message }}</li>
-    {% endfor %}
-    </ul>
-  {% endif %}
+{% if messages %}
+<ul class="error-messages">
+  {% for message in messages %}
+  <li class="error">{{ message }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
 {% endwith %}
 
 

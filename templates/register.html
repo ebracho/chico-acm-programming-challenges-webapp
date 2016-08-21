@@ -1,33 +1,43 @@
-<form action="/register", method="post">
-  <div>
-    <label for="user-id">User Id:</label>
-    <input type="text" name="user-id" id="user-id" />
-  </div>
-  <div>
-    <label for="password">Password:</label>
-    <input type="password" name="password" id="password" />
-  </div>
-  <div>
-    <label for="confirm-password">Confirm Password:</label>
-    <input type="password" name="confirm-password" id="confirm-password" />
-  </div>
-  <div>
-    <button type="submit">Register</button>
-  </div>
-  <div>
-  {% with messages = get_flashed_messages()  %}
-    {% if messages %}
-      <ul class="error-messages">
-      {% for message in messages %}
-        <li class="error">{{ message }}</li>
-      {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
-  </div>
-  <div>
-    <!-- Tells server where to redirect to after POST -->
-    <input type="hidden" name="next" value="{{ next or request.args.get('next', '') }}" />
-  </div>
-</form>
+{% extends "base.html" %}
 
+
+{% block body %}
+
+
+<div class="row">
+  <div class="col-md-4 col-md-offset-4">
+    <form action="/register" method="post">
+      <div class="form-group{{ ' has-' + validation['user_id']['level'] if 'user_id' in validation }}">
+        <label class="control-label" for="user-id">User Id:</label>
+        <input type="text" name="user-id" class="form-control" value="{{ form_cache.get('user_id', '') }}"/> 
+        {% if 'user_id' in validation %}
+        <span class="help-block">{{ validation['user_id']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group{{ ' has-' + validation['password']['level'] if 'password' in validation }}">
+        <label class="control-label" for="password">Password:</label>
+        <input type="password" name="password" class="form-control"/>
+        {% if 'password' in validation %}
+        <div class="help-block">{{ validation['password']['msg'] }}</div>
+        {% endif %}
+      </div>
+      <div class="form-group{{ ' has-' + validation['confirm_password']['level'] if 'confirm_password' in validation }}">
+        <label class="control-label" for="confirm-password">Confirm Password:</label>
+        <input type="password" name="confirm-password" class="form-control"/>
+        {% if 'confirm_password' in validation %}
+        <span class="help-block">{{ validation['confirm_password']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary">Register</button>
+      </div>
+      <div>
+        <!-- Tells server where to redirect to after POST -->
+        <input type="hidden" name="next" value="{{ next or request.args.get('next', '') }}" />
+      </div>
+    </form>
+  </div>
+</div>
+
+
+{% endblock %}

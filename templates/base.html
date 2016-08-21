@@ -1,26 +1,51 @@
 <head>
   <meta charset="utf-8"/>
-  <link rel="stylesheet" href="/static/css/bootstrap.min.css"  charset="utf-8" />
-  <link rel="stylesheet" type="text/css" href="/static/style.css"/>
+  <title>Chico ACM Club Programming Challenges</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Chico ACM Club Programming Challenges">
+  <meta name="author" content="Eddie Bracho">
+  <link rel="stylesheet" type="text/css" href="/static/css/style.css"/>
 </head>
 
 <body>
-    <!-- navbar -->
-    <ul id="navbar">
-        <li><a href="{{ url_for('home') }}">Home</a></li>
-        <li><a href="{{ url_for('problem_form') }}">Create Problem</a></li>
-        {% if 'logged_in_user' in session %}
-            <li><a href="{{ url_for('view_user', user_id=session['logged_in_user']) }}">{{ session['logged_in_user'] }}</a></li>
-            <li><form action="{{ url_for('logout') }}" method="post"><button type="submit">Logout</button></form></li>
-        {% else %}
-            <li><a href="{{ url_for('login') }}">Login</a></li>
-            <li><a href="{{ url_for('register') }}">Register</a></li>
-        {% endif %}
-    </ul>
-{% block body %}
-{% endblock %}
 
-    <!-- Be careful, may need to move  -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
-    <script src="js/bootstrap.js"></script>
+  <nav class="navbar navbar-inverse">
+    <div class="container">
+      <a class="navbar-brand" href="{{ url_for('home') }}">
+        <span class="glyphicon glyphicon-home"></span>
+      </a>
+      <ul class="nav navbar-nav navbar-left">
+        <li><a class="nav-item nav-link" href="{{ url_for('problem_form') }}">Create Problem</a></li>
+      </ul>
+      {% if 'logged_in_user' in session %}
+      <form class="navbar-form navbar-right" action="{{ url_for('logout') }}" method="post">
+        <button class="btn btn-inverted" type="submit">Logout</button>
+      </form>
+      <ul class="nav navbar-nav navbar-right">
+        <li><p class="navbar-text">Signed in as <a class="navbar-link" href="{{ url_for('view_user', user_id=session['logged_in_user']) }}">{{ session['logged_in_user'] }}</a></p></li>
+      </ul>
+      {% else %}
+      <ul class = "nav navbar-nav navbar-right">
+        <li><a href="{{ url_for('login') }}">Login</a></li>
+        <li><a href="{{ url_for('register') }}">Register</a></li>
+      </ul>
+      {% endif %}
+      </ul>>
+    </div>
+  </nav>
+
+  <div class="container">
+    {% block body %}
+    {% endblock %}
+  </div>
+
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+  <!-- Latest compiled and minified JavaScript -->
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
 </body>

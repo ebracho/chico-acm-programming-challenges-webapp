@@ -10,40 +10,40 @@
 <p>Verification: {{ solution.verification }}</p>
 <h3>Source</h3>
 <div>
-<pre><code class="{{ solution.language }}">{{ solution.source }}</code></pre>
-{% if solution.user_id == session.get('logged_in_user', None) %}
-    <form action="{{ url_for('delete_solution', problem_id=problem.id, solution_id=solution.id) }}" method="post">
-        <button type="submit">Delete Solution</button>
-    </form>
-{% endif %}
+  <pre><code class="{{ solution.language }}">{{ solution.source }}</code></pre>
+  {% if solution.user_id == session.get('logged_in_user', None) %}
+  <form action="{{ url_for('delete_solution', problem_id=problem.id, solution_id=solution.id) }}" method="post">
+    <button type="submit">Delete Solution</button>
+  </form>
+  {% endif %}
 </div>
 
 <div>
   <h3>Comments</h3>
   {% for comment in comments %}
-    <div class="comment">
-      <a href="{{ url_for('view_user', user_id=comment.user_id) }}">{{ comment.user_id }}</a> - <em>{{ comment.submission_time | datetime }}</em>
-      {{ comment.body | markdown(no_html=True) }}
-      {% if comment.user_id == session.get('logged_in_user', None) %}
-        <form action="{{ url_for('delete_solution_comment', comment_id=comment.id) }}" method="post">
-            <button type="submit">Delete</button>
-        </form>
-      {% endif %}
-    </div>
+  <div class="comment">
+    <a href="{{ url_for('view_user', user_id=comment.user_id) }}">{{ comment.user_id }}</a> - <em>{{ comment.submission_time | datetime }}</em>
+    {{ comment.body | markdown(no_html=True) }}
+    {% if comment.user_id == session.get('logged_in_user', None) %}
+    <form action="{{ url_for('delete_solution_comment', comment_id=comment.id) }}" method="post">
+      <button type="submit">Delete</button>
+    </form>
+    {% endif %}
+  </div>
   {% else %}
-      <p>No comments found.</p>
+  <p>No comments found.</p>
   {% endfor %}
 </div>
 
 <div>
   {% if 'logged_in_user' in session %}
-    <h3>Submit Comment</h3>
-    <form action="{{ url_for('create_solution_comment', problem_id=problem.id, solution_id=solution.id) }}" method="post">
-      <textarea name="body" rows="4" cols="50"></textarea>
-      <button type="submit">Submit</button>
-    </form>
+  <h3>Submit Comment</h3>
+  <form action="{{ url_for('create_solution_comment', problem_id=problem.id, solution_id=solution.id) }}" method="post">
+    <textarea name="body" rows="4" cols="50"></textarea>
+    <button type="submit">Submit</button>
+  </form>
   {% else %}
-    <p><a href="{{ url_for('login', next=request.url) }}">Login</a> to submit a comment</p>
+  <p><a href="{{ url_for('login', next=request.url) }}">Login</a> to submit a comment</p>
   {% endif %}
 </div>
 

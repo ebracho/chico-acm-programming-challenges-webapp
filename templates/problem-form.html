@@ -4,42 +4,50 @@
 
 
 <form action="/problem" method="post" enctype="multipart/form-data">
-  <div>
-    <label for="title">Title:</label>
-    <input type="text" name="title" id="title" />
-  </div>
-  <div>
-    <label for="prompt">Prompt:</label>
-    <textarea name="prompt" id="prompt" rows="4" cols="50"></textarea>
-  </div>
-  <div>
-    <label for="test-input">Test Input:</label>
-    <input type="file" name="test-input-file" id="test-input-file" />
-  </div>
-  <div>
-    <label for="test-output">Test Output:</label>
-    <input type="file" name="test-output-file" id="test-output-file" />
-  </div>
-  <div>
-    <label for="timeout">Timeout:</label>
-    <select name="timeout" id="timeout">
-    {% for time in range(3,11) %}
-      <option value="{{ time }}">{{ time }}</option>
-    {% endfor %}
-    </select>
-  </div>
-  <div>
-    <button type="submit">Submit</button>
-  </div>
-  {% with messages = get_flashed_messages()  %}
-    {% if messages %}
-      <ul class="error-messages">
-      {% for message in messages %}
-        <li class="error">{{ message }}</li>
-      {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
+  <div class="row">
+    <div class="col-md-9">
+      <div class="form-group{{ ' has-' + validation['title']['level'] if 'title' in validation }}">
+        <label class="control-label" for="title">Title:</label>
+        <input type="text" name="title" class="form-control" value="{{ form_cache.get('title', '') }}"/>
+        {% if 'title' in validation %}
+        <span class="help-block">{{ validation['title']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group{{ ' has-' + validation['prompt']['level'] if 'prompt' in validation }}">
+        <label class="control-label" for="prompt">Prompt:</label>
+        <textarea name="prompt" class="form-control" rows="7" value="{{ form_cache.get('prompt', '') }}"></textarea>
+        {% if 'prompt' in validation %}
+        <span class="help-block">{{ validation['prompt']['msg'] }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="form-group{{ ' has-' + validation['test_input_file']['level'] if 'test_input_file' in validation }}">
+        <label class="control-label" for="test-input">Test Input:</label>
+        <input type="file" name="test-input-file" class="btn btn-default" />
+        {% if 'test_input_file' in validation %}
+        <span class="help-block">{{ validation['test_input_file']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group{{ ' has-' + validation['test_output_file']['level'] if 'test_output_file' in validation }}">
+        <label class="control-label" for="test-output">Test Output:</label>
+        <input type="file" name="test-output-file" class="btn btn-default" />
+        {% if 'test_output_file' in validation %}
+        <span class="help-block">{{ validation['test_output_file']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label class="control-label" for="timeout">Timeout:</label>
+        <select name="timeout" id="timeout" class="form-control">
+          {% for time in range(3,11) %}
+          <option value="{{ time }}"{{ ' selected="selected"' if time == form_cache.get('time', None) }}>{{ time }} seconds</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </div>
+    </div>
   </div>
 </form>
 

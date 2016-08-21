@@ -11,6 +11,7 @@ from verify import supported_languages, verify
 app = Flask(__name__)
 Misaka(app) # Load Misaka extension (used for jinja2 markdown filter)
 app.secret_key = 'development_key'
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 # 1 MiB filesize limit
 
 
 
@@ -84,60 +85,79 @@ def home():
 
 @app.route('/register', methods=['GET'])
 def register_form():
-    return render_template('register.html')
+    return render_template('register.html', validation={}, form_cache={})
 
 
 @app.route('/register', methods=['POST'])
 def register():
     db_session = get_db_session()
-    user_id = request.form.get('user-id', None)
-    password = request.form.get('password', None)
-    confirm_password = request.form.get('confirm-password', None)
+    user_id = request.form.get('user-id', '')
+    password = request.form.get('password', '')
+    confirm_password = request.form.get('confirm-password', '')
     next = get_redirect_target()
 
-    if user_id is None or password is None or confirm_password is None:
-        flash('Missing field(s)')
-    elif not (3 <= len(user_id) <= 15):
-        flash('User id must be between 3 and 15 chars')
-    elif not user_id.isalnum():
-        flash('User id must be alphanumeric')
-    elif User.exists(db_session, user_id):
-        flash('User id already exists')
-    elif not (7 <= len(password) <= 128):
-        flash('Password must be between 7 and 128 chars')
-    elif password != confirm_password:
-        flash('Passwords do not match')
-    else:
-        user = User(user_id, password)
-        db_session.add(user)
-        session['logged_in_user'] = user_id
-        return redirect(next)
+    validation = {}
+    form_cache = {}
 
-    return render_template('register.html', next=next)
+    # user_id validation
+    if not user_id:
+        validation['user_id'] = { 'level': 'error', 'msg': 'Required field.' }
+    elif not (3 <= len(user_id) <= 15):
+        validation['user_id'] = { 'level': 'warning', 'msg': 'User id must be between 3 and 15 characters' }
+    elif not user_id.isalnum():
+        validation['user_id'] = { 'level': 'warning', 'msg': 'User id may contain only letters and numbers' }
+    elif User.exists(db_session, user_id):
+        validation['user_id'] = { 'level': 'error', 'msg': 'User id is taken.' }
+
+    # password validation
+    if not password:
+        validation['password'] = { 'level': 'error', 'msg': 'Required field.' }
+    elif not (7 <= len(password) <= 128):
+        validation['password'] = { 'level': 'warning', 'msg': 'Password must be between 7 and 128 characters.' }
+
+    # confirm_password validation
+    if not confirm_password:
+        validation['confirm_password'] = { 'level': 'error', 'msg': 'Required field.' }
+    elif password != confirm_password:
+        validation['confirm_password'] = { 'level': 'warning', 'msg': 'Passwords do not match.' }
+
+    if validation:
+        form_cache = { 'user_id': user_id }
+        return render_template('register.html', next=next, validation=validation, form_cache=form_cache)
+
+    user = User(user_id, password)
+    db_session.add(user)
+    session['logged_in_user'] = user_id
+    return redirect(next)
+
 
 
 @app.route('/login', methods=['GET'])
 def login_form():
-    return render_template('login.html')
+    return render_template('login.html', validation={}, form_cache={})
 
 
 @app.route('/login', methods=['POST'])
 def login():
     db_session = get_db_session()
-    user_id = request.form.get('user-id', None)
-    password = request.form.get('password', None)
+    user_id = request.form.get('user-id', '')
+    password = request.form.get('password', '')
     next = get_redirect_target()
 
-    if user_id is None or password is None:
-        flash('Missing fields(s)')
-        return render_template('login.html', next=next)
-    user = db_session.query(User).filter(User.id == user_id).first()
-    if user is None:
-        flash('Invalid userId/password')
-        return render_template('login.html', next=next)
-    if not user.auth(password):
-        flash('Invalid userId/password')
-        return render_template('login.html', next=next)
+    validation = {}
+    if not password:
+        validation['password'] = { 'level': 'error', 'msg': 'Required field' }
+    if not user_id:
+        validation['user_id'] = { 'level': 'error', 'msg': 'Required field' }
+    else:
+        user = db_session.query(User).filter(User.id == user_id).first()
+        if user is None or not user.auth(password):
+            validation['user_id'] = { 'level': 'error', 'msg': 'Invalid userid or password' }
+            validation['password'] = { 'level': 'error', 'msg': 'Invalid userid or password' }
+
+    if validation:
+        form_cache = { 'user_id': user_id }
+        return render_template('login.html', next=next, validation=validation, form_cache=form_cache)
 
     session['logged_in_user'] = user_id
     return redirect(next)
@@ -169,38 +189,45 @@ def view_user(user_id):
 @app.route('/problem', methods=['GET'])
 @requires_login
 def problem_form():
-    return render_template('problem-form.html')
+    return render_template('problem-form.html', form_cache={})
 
 
 @app.route('/problem', methods=['POST'])
 def create_problem():
     db_session = get_db_session()
-    title = request.form.get('title', None)
-    prompt = request.form.get('prompt', None)
+    title = request.form.get('title', '')
+    prompt = request.form.get('prompt', '')
     test_input_file = request.files.get('test-input-file', None)
     test_output_file = request.files.get('test-output-file', None)
     timeout = int(request.form.get('timeout', 3))
 
-    print(request.files)
-
+    validation = {}
     if not 'logged_in_user' in session:
         abort(401)
-    elif None in [title, prompt, test_input_file, test_output_file]:
-        print(title, prompt, test_input_file, test_output_file)
-        flash('Missing parameter(s)')
-    elif not 3 <= timeout <= 10:
-        flash('Timeout must be between 3 and 10 seconds')
-    else:
-        problem = Problem(
-            title=title, prompt=prompt, 
-            test_input=test_input_file.read().decode('utf-8')[:-1], # remove trailing newline
-            test_output=test_output_file.read().decode('utf-8')[:-1], # remove trailing newline 
-            timeout=timeout, user_id=session['logged_in_user'])
-        db_session.add(problem)
-        db_session.commit()
-        return redirect(url_for('view_problem', problem_id=problem.id))
+    if not title:
+        validation['title'] = { 'level': 'error', 'msg': 'Field Required'}
+    if not prompt:
+        validation['prompt'] = { 'level': 'error', 'msg': 'Field required' }
+    if not test_input_file:
+        validation['test_input_file'] = { 'level': 'error', 'msg': 'Field required' }
+    if not test_output_file:
+        validation['test_output_file'] = { 'level': 'error', 'msg': 'Field required' }
+    if not 3 <= timeout <= 10:
+        abort(400)
+
+    if validation:
+        form_cache = { 'title': title, 'prompt': prompt, 'timeout': timeout }
+        return render_template('problem-form.html', validation=validation, form_cache=form_cache)
+
+    problem = Problem(
+        title=title, prompt=prompt, 
+        test_input=test_input_file.read().decode('utf-8')[:-1], # remove trailing newline
+        test_output=test_output_file.read().decode('utf-8')[:-1], # remove trailing newline 
+        timeout=timeout, user_id=session['logged_in_user'])
+    db_session.add(problem)
+    db_session.commit()
+    return redirect(url_for('view_problem', problem_id=problem.id))
     
-    return render_template('problem-form.html')
 
 
 @app.route('/problem/<problem_id>', methods=['GET'])
@@ -216,6 +243,7 @@ def view_problem(problem_id):
     solutions = (
         db_session.query(Solution)
         .filter(Solution.problem_id==problem_id)
+        .filter(Solution.verification=='PASS')
         .order_by(Solution.submission_time)
         .all()
     )
