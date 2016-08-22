@@ -189,7 +189,7 @@ def view_user(user_id):
 @app.route('/problem', methods=['GET'])
 @requires_login
 def problem_form():
-    return render_template('problem-form.html', form_cache={})
+    return render_template('problem-form.html', validation={}, form_cache={}, preview=False)
 
 
 @app.route('/problem', methods=['POST'])
@@ -200,6 +200,12 @@ def create_problem():
     test_input_file = request.files.get('test-input-file', None)
     test_output_file = request.files.get('test-output-file', None)
     timeout = int(request.form.get('timeout', 3))
+
+    form_cache = { 
+        'title': title, 
+        'prompt': prompt, 
+        'timeout': timeout 
+    }
 
     validation = {}
     if not 'logged_in_user' in session:
@@ -215,9 +221,13 @@ def create_problem():
     if not 3 <= timeout <= 10:
         abort(400)
 
+    if 'preview' in request.form:
+        return render_template(
+            'problem-form.html', form_cache=form_cache, preview=True)
+
     if validation:
-        form_cache = { 'title': title, 'prompt': prompt, 'timeout': timeout }
-        return render_template('problem-form.html', validation=validation, form_cache=form_cache)
+        return render_template(
+            'problem-form.html', validation=validation, form_cache=form_cache)
 
     problem = Problem(
         title=title, prompt=prompt, 
@@ -253,7 +263,9 @@ def view_problem(problem_id):
         .order_by(ProblemComment.submission_time)
         .all()
     )
-    return render_template('view-problem.html', problem=problem, solutions=solutions, comments=comments)
+    return render_template(
+        'view-problem.html', problem=problem, solutions=solutions, 
+        comments=comments)
 
 
 @app.route('/problem/<problem_id>', methods=['POST']) # html forms don't support delete
@@ -372,20 +384,29 @@ def delete_solution(problem_id, solution_id):
 @requires_login
 def create_problem_comment(problem_id):
     db_session = get_db_session()
-    body = request.form.get('body', None)
+    body = request.form.get('body', '')
 
+    validation={}
     if not Problem.exists(db_session, problem_id):
         abort(404)
-    elif body is None:
-        abort(400)
-    elif body == '':
-        flash('Comment body cannot be empty')
-    else:
-        comment = ProblemComment(
-            problem_id=problem_id, user_id=session['logged_in_user'], body=body)
-        db_session.add(comment)
+    if body == '':
+        validation['body'] = { 'level': 'error', 'msg': 'Comment body cannot be empty' }
 
+    if 'preview' in request.form:
+        session['form_cache'] = { 'body': body }
+        return redirect(url_for(
+            'view_problem', problem_id=problem_id, _anchor="comment-form", preview=True))
+
+    if validation:
+        session['validation'] = validation
+        return redirect(url_for(
+            'view_problem', problem_id=problem_id, _anchor="comment-form"))
+
+    comment = ProblemComment(
+        problem_id=problem_id, user_id=session['logged_in_user'], body=body)
+    db_session.add(comment)
     return redirect(url_for('view_problem', problem_id=problem_id))
+
     
 
 @app.route('/problem-comment/<comment_id>/', methods=['POST']) # html forms don't support delete

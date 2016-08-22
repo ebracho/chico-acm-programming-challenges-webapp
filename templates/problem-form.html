@@ -15,7 +15,7 @@
       </div>
       <div class="form-group{{ ' has-' + validation['prompt']['level'] if 'prompt' in validation }}">
         <label class="control-label" for="prompt">Prompt:</label>
-        <textarea name="prompt" class="form-control" rows="7" value="{{ form_cache.get('prompt', '') }}"></textarea>
+        <textarea name="prompt" class="form-control" rows="7">{{ form_cache.get('prompt', '') }}</textarea>
         {% if 'prompt' in validation %}
         <span class="help-block">{{ validation['prompt']['msg'] }}</span>
         {% endif %}
@@ -40,16 +40,24 @@
         <label class="control-label" for="timeout">Timeout:</label>
         <select name="timeout" id="timeout" class="form-control">
           {% for time in range(3,11) %}
-          <option value="{{ time }}"{{ ' selected="selected"' if time == form_cache.get('time', None) }}>{{ time }} seconds</option>
+          <option value="{{ time }}"{{ ' selected="selected"' if time == form_cache.get('timeout', None) }}>{{ time }} seconds</option>
           {% endfor %}
         </select>
       </div>
-      <div class="form-group">
-        <button type="submit" class="btn btn-primary">Submit</button>
+      <div class="form-inline">
+        <button type="submit" name="preview" value="preview-button" class="btn btn-default">Preview</button>
+        <button type="submit" name="submit" value="submit-butotn" class="btn btn-primary">Submit</button>
       </div>
     </div>
   </div>
 </form>
+
+{% if preview %}
+<h2>{{ form_cache['title'] | e }}</h2>
+<div class="well">
+  <p>{{ form_cache['prompt'] | markdown(no_html=True) }}</p>
+</div>
+{% endif %}
 
 
 {% endblock %}

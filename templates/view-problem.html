@@ -3,80 +3,150 @@
 {% block body %}
 
 
-<div id=problem-info>
-  {% if problem.user_id == session.get('logged_in_user', None) %}
-  <div class="pull-right">
-    <form action="{{ url_for('delete_problem', problem_id=problem.id) }}" method="post">
-      <button class="btn btn-danger" type="submit">Delete Problem</button>
-    </form>
+
+<div class="row">
+
+  <div class="col-md-8">
+    <h2>{{ problem.title | e }}</h2>
+    <p>Created by: <a href="{{ url_for('view_user', user_id=problem.user_id) }}">{{ problem.user_id }}</a></p>
+    <p>Submission time: <em>{{ problem.submission_time | datetime }}</em></p>
+
+    {% if problem.user_id == session.get('logged_in_user', '') %}
+    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete-problem">Delete Problem</button>
+
+    <div class="modal fade" id="delete-problem" tab-index="-1" role="dialog">
+      <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+            <p>Are you sure?</p>
+          </div>
+          <div class="modal-body">
+            <p>Deleting this problem will also remove all associated comments and solutions</p>
+            <form action="{{ url_for('delete_problem', problem_id=problem.id) }}" method="post">
+              <button class="btn btn-danger" type="submit">Delete Problem</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
-  <h2>{{ problem.title }}</h2>
-  <p>Created By: <a href="{{ url_for('view_user', user_id=problem.user_id) }}">{{ problem.user_id }}</a></p>
-  <p>Submission Time: <em>{{ problem.submission_time | datetime }}</em></p>
-  <h3>Prompt</h3>
-  <div class="well">
-    <p>{{ problem.prompt | markdown(no_html=True) }}</p>
+
+</div>
+    
+<div class="row">
+
+  <div class="col-md-8">
+    <h3>Prompt</h3>
+    <div class="well">
+      <p>{{ problem.prompt | markdown(no_html=True) }}</p>
+    </div>
   </div>
+
+  <div class="col-md-4">
+    <h3>Solutions</h3>
+    <div class="list-group">
+      {% for solution in solutions %}
+      <a class="list-group-item" href="{{ url_for('view_solution', problem_id=problem.id, solution_id=solution.id) }}">
+        {{ solution.language }} | {{ solution.user_id }}
+      </a>
+      {% else %}
+      <li>No solutions found</li>
+      {% endfor %}
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a>
+  </div>
+
 </div>
 
-<div id="solutions-container">
-  <a class="btn btn-primary pull-right" href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a>
-  <h3>Solutions</h3>
-  <div class="list-group">
-    {% for solution in solutions %}
-    <a class="list-group-item" href="{{ url_for('view_solution', problem_id=problem.id, solution_id=solution.id) }}">{{ solution.language }} | {{ solution.user_id }}</a>
-    {% else %}
-    <li>No solutions found</li>
-    {% endfor %}
-  </div>
-</div>
 
 <hr/>
 
-<div id="comment-box">
-  <h3>Comments</h3>
-  {% for comment in comments %}
-  <div class="panel panel-default">
-    <div class="panel-heading">
-      <a href="{{ url_for('view_user', user_id=comment.user_id) }}">{{ comment.user_id }}</a> - <em>{{ comment.submission_time | datetime }}</em>
-      {% if session['logged_in_user'] == comment.user_id %}
-      <span class="pull-right">
-        <button class="btn btn-danger" data-toggle="modal" data-target=".delete-comment-{{ comment.id }}"><span class="glyphicon glyphicon-remove"></span></button>
-      </span>
-      {% endif %}
-    </div>
-    <div class="panel-body">
-      {{ comment.body | markdown(no_html=True) }}
-    </div>
-  </div>
-  <div class="modal fade delete-comment-{{ comment.id }}" tab-index="-1" role="dialog">
-    <div class="modal-dialog modal-sm">
-      <div class="modal-content">
-        <p>Are you sure?</p>
-        <form action="{{ url_for('delete_problem_comment', comment_id=comment.id) }}" method="post">
-          <button class="btn btn-default" type="submit">Delete Comment</button>
-        </form>
+<div class="row">
+
+  <div id="col-md-12">
+    <h3>Comments</h3>
+    {% for comment in comments %}
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <a href="{{ url_for('view_user', user_id=comment.user_id) }}">{{ comment.user_id }}</a> - <em>{{ comment.submission_time | datetime }}</em>
+        {% if session['logged_in_user'] == comment.user_id %}
+        <span class="pull-right">
+          <button class="btn btn-danger" data-toggle="modal" data-target=".delete-comment-{{ comment.id }}">
+            <span class="glyphicon glyphicon-remove"></span>
+          </button>
+        </span>
+        {% endif %}
+      </div>
+      <div class="panel-body">
+        {{ comment.body | markdown(no_html=True) }}
       </div>
     </div>
+
+    <div class="modal fade delete-comment-{{ comment.id }}" tab-index="-1" role="dialog">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+            <p>Are you sure?</p>
+          </div>
+          <div class="modal-body">
+            <form action="{{ url_for('delete_problem_comment', comment_id=comment.id) }}" method="post">
+              <button class="btn btn-danger" type="submit">Delete Comment</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+      <p>No comments found<p>
+    {% endfor %}
   </div>
-  {% else %}
-    <p>No comments found<p>
-  {% endfor %}
+
+</div>
+
+<div class="row">
 
   {% if 'logged_in_user' in session %}
-  <form action="{{ url_for('create_problem_comment', problem_id=problem.id) }}" method="post" >
-    <div class="form-group">
-      <label for="body">Write a comment.</label>
-      <textarea class="form-control" name="body" id="body" rows="4" cols="50"></textarea>
-      <small class="form-text pull-right"><a data-toggle="collapse" href="#formatting-help">formatting help</a></small>
+
+  <div class="col-md-8" id="comment-form">
+    <form action="{{ url_for('create_problem_comment', problem_id=problem.id) }}" method="post" >
+      <div class="form-group{{ ' has-' + session['validation']['body']['level'] if 'validation' in session }}">
+        <label for="body">Write a comment.</label>
+        <textarea class="form-control" name="body" id="body" rows="4" cols="50">
+{{ session['form_cache']['body'] if 'form_cache' in session }}
+        </textarea>
+        <small class="form-text pull-right"><a data-toggle="collapse" href="#formatting-help">formatting help</a></small>
+        {% if 'validation' in session %}
+        <span class="help-block">{{ session.pop('validation')['body']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <button class="btn btn-default" name="preview" value="preview" type="submit">Preview</button>
+        <button class="btn btn-primary" name="submit" value="submit" type="submit">Submit</button>
+      </div>
+    </form>
+    {% if request.args.get('preview', '') %}
+    {% if 'form_cache' in session %}
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        Preview
+      </div>
+      <div class="panel-body">
+        {{ session.pop('form_cache')['body'] | markdown(no_html=True) }}
+      </div>
     </div>
-    <div class="form-group">
-      <button class="btn btn-primary" type="submit">Submit</button>
-    </div>
-  </form>
-  <div class="collapse" id="formatting-help">
-    <div class="col-md-7">
+    {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="col-md-4 collapse" id="formatting-help">
+    <div class="well">
       <table class="table">
         <thead>
           <tr>
@@ -98,8 +168,8 @@
             <td><strike>text</strike></td>
           </tr>
           <tr>
-            <td>[link](https://www.google.com)</td>
-            <td><a href="https://www.google.com">link</a></td>
+            <td>[link](google.com)</td>
+            <td><a href="google.com">link</a></td>
           </tr>
           <tr>
             <td>`inline code`</td>
@@ -139,7 +209,7 @@
             </td>
           </tr>
           <tr>
-            <td>> Quoted Text</td>
+            <td>&gt Quoted Text</td>
             <td><q>Quoted Text</q></td>
           </tr>
           <tr>
@@ -166,9 +236,11 @@
       </table>
     </div>
   </div>
+
   {% else %}
-  <p><a href="{{ url_for('login', next=request.url) }}">Login</a> to submit a comment</p>
+  <p><a href="{{ url_for('login', next=request.url) }}">Login</a> to submit a comment.</p>
   {% endif %}
+
 </div>
 
 
