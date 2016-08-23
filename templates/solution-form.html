@@ -3,36 +3,45 @@
 {% block body %}
 
 
-<h2>{{ problem.title }}</h2>
-<p>{{ problem.prompt }}</p>
-<br/>
-<h3>Your Solution</h3>
-<form action="{{ url_for('create_solution', problem_id=problem.id) }}" method="post" enctype="multipart/form-data" >
-  <div>
-    <input type="file" id="source-file" name="source-file" />
-  </div>
-  <div>
-    <select name="language" id="language">
-      {% for language in supported_languages %}
-      <option value="{{ language }}">{{ language }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div>
-    <button type="submit">Submit</button>
-  </div>
-</form>
+<div class="row">
 
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-<ul class="error-messages">
-  {% for message in messages %}
-  <li class="error">{{ message }}</li>
-  {% endfor %}
-</ul>
-{% endif %}
-{% endwith %}
+  <div class="col-md-8">
+    <!-- problem heading/prompt -->
+    <h2><a href="{{ url_for('view_problem', problem_id=problem.id) }}">{{ problem.title }}</a></h2>
+    <div class="well">
+      <p>{{ problem.prompt }}</p>
+    </div>
+  </div>
 
+  <div class="col-md-4">
+    <!-- solution form -->
+    <h3>Your Solution</h3>
+    <form action="{{ url_for('create_solution', problem_id=problem.id) }}" method="post" enctype="multipart/form-data" >
+      <div class="form-group{{ ' has-' + validation['source_file']['level'] if 'source_file' in validation }}">
+        <label for="source-file" class="control-label">Source file:</label>
+        <input type="file" id="source-file" name="source-file" class="btn btn-default"/>
+        {% if 'source_file' in validation %}
+        <span class="help-block">{{ validation['source_file']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group{{ ' has-' + validation['language']['level'] if 'language' in validation }}">
+        <label for="language" class="control-label">Language:</label>
+        <select name="language" id="language" class="form-control">
+          {% for language in supported_languages %}
+          <option value="{{ language }}" {{ 'selected="selected"' if language == form_cache.get('language', '') }}>{{ language }}</option>
+          {% endfor %}
+        </select>
+        {% if 'language' in validation %}
+        <span class="help-text">{{ validation['language']['msg'] }}</span>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <button class="btn btn-primary" name="submit" value="submit" type="submit">Submit</button>
+      </div>
+    </form>
+  </div>
+
+</div>
 
 {% endblock %}
 

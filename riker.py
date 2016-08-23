@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, session, render_template, redirect, \
                   url_for, g, flash, abort
 from flask_misaka import Misaka
@@ -12,7 +13,6 @@ app = Flask(__name__)
 Misaka(app) # Load Misaka extension (used for jinja2 markdown filter)
 app.secret_key = 'development_key'
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 # 1 MiB filesize limit
-
 
 
 #############################
@@ -195,8 +195,8 @@ def problem_form():
 @app.route('/problem', methods=['POST'])
 def create_problem():
     db_session = get_db_session()
-    title = request.form.get('title', '')
-    prompt = request.form.get('prompt', '')
+    title = request.form.get('title', '').strip()
+    prompt = request.form.get('prompt', '').strip()
     test_input_file = request.files.get('test-input-file', None)
     test_output_file = request.files.get('test-output-file', None)
     timeout = int(request.form.get('timeout', 3))
@@ -236,6 +236,7 @@ def create_problem():
         timeout=timeout, user_id=session['logged_in_user'])
     db_session.add(problem)
     db_session.commit()
+
     return redirect(url_for('view_problem', problem_id=problem.id))
     
 
@@ -271,7 +272,7 @@ def view_problem(problem_id):
 @app.route('/problem/<problem_id>', methods=['POST']) # html forms don't support delete
 @requires_login
 def delete_problem(problem_id):
-    """Deletes problem and all associated solutions form database"""
+    """Deletes problem and all associated comments/solutions form database"""
     db_session = get_db_session()
     problem = (
         db_session.query(Problem)
@@ -305,7 +306,7 @@ def solution_form(problem_id):
     if problem is None:
         abort(404)
     return render_template(
-        'solution-form.html', problem=problem, 
+        'solution-form.html', problem=problem, validation={}, form_cache={},
         supported_languages=supported_languages)
 
 
@@ -323,22 +324,32 @@ def create_solution(problem_id):
     
     source_file = request.files.get('source-file', None)
     language = request.form.get('language', None)
-    if source_file is None or language is None:
-        flash('Missing parameter(s)')
-    elif language not in supported_languages:
-        flash('Language not supported')
-    else:
-        solution = Solution(
-            problem_id=problem_id, user_id=session['logged_in_user'], 
-            language=language, source=source_file.read().decode('utf-8'), 
-            verification='pending')
-        db_session.add(solution)
-        db_session.commit()
-        solution.verify() # Launch verification thread
-        return redirect(url_for(
-            'view_solution', problem_id=problem_id, solution_id=solution.id))
 
-    return redirect(url_for('solution_form', problem_id=problem_id))
+    validation = {}
+    if source_file is None or source_file.filename == '':
+        validation['source_file'] = { 'level': 'error', 'msg': 'Field required' }
+    if language is None:
+        validation['language'] = { 'level': 'error', 'msg': 'Field required' }
+    elif language not in supported_languages:
+        validation['language'] = { 'level': 'error', 'msg': 'Language not supported' }
+
+    if validation:
+        form_cache = { 'language': language }
+        return render_template(
+            'solution-form.html', problem=problem, validation=validation, 
+            form_cache=form_cache, supported_languages=supported_languages)
+
+    solution = Solution(
+        problem_id=problem_id, user_id=session['logged_in_user'], 
+        language=language, source=source_file.read().decode('utf-8'), 
+        verification='PENDING')
+    db_session.add(solution)
+    db_session.commit()
+    solution.verify() # Launch verification thread
+
+    return redirect(url_for(
+        'view_solution', problem_id=problem_id, solution_id=solution.id))
+
     
 
 
@@ -384,12 +395,12 @@ def delete_solution(problem_id, solution_id):
 @requires_login
 def create_problem_comment(problem_id):
     db_session = get_db_session()
-    body = request.form.get('body', '')
+    body = request.form.get('body', '').strip()
 
     validation={}
     if not Problem.exists(db_session, problem_id):
         abort(404)
-    if body == '':
+    if not body:
         validation['body'] = { 'level': 'error', 'msg': 'Comment body cannot be empty' }
 
     if 'preview' in request.form:
@@ -432,24 +443,35 @@ def delete_problem_comment(comment_id):
 @requires_login
 def create_solution_comment(problem_id, solution_id):
     db_session = get_db_session()
-    body = request.form.get('body', None)
+    body = request.form.get('body', '').strip()
 
+    validation={}
     if not Problem.exists(db_session, problem_id):
         abort(404)
-    elif not Solution.exists(db_session, solution_id):
+    if not Solution.exists(db_session, solution_id):
         abort(404)
-    elif body is None:
-        abort(400)
-    elif body == '':
-        flash('Comment body cannot be empty')
-    else:
-        comment = SolutionComment(
-            solution_id=solution_id, user_id=session['logged_in_user'], body=body)
-        db_session.add(comment)
+    if not body:
+        validation['body'] = { 'level': 'error', 'msg': 'Comment body cannot be empty' }
+
+    if 'preview' in request.form:
+        session['form_cache'] = { 'body': body }
+        return redirect(url_for(
+            'view_solution', problem_id=problem_id, solution_id=solution_id,
+            _anchor="comment-form", preview=True))
+
+    if validation:
+        session['validation'] = validation
+        return redirect(url_for(
+            'view_solution', problem_id=problem_id, solution_id=solution_id, 
+            _anchor="comment-form"))
+
+    comment = SolutionComment(
+        solution_id=solution_id, user_id=session['logged_in_user'], body=body)
+    db_session.add(comment)
 
     return redirect(url_for(
         'view_solution', problem_id=problem_id, solution_id=solution_id))
-    
+
 
 @app.route('/solution-comment/<comment_id>/delete', methods=['POST']) # html form don't support DELETE
 @requires_login
@@ -487,5 +509,6 @@ def format_datetime(value):
     return value.strftime('%a %b %d %Y')
 
 
-app.run(host='0.0.0.0', port=80)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80)
 
