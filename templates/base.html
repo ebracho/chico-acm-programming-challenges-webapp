@@ -22,12 +22,12 @@
         <button class="btn btn-inverted" type="submit">Logout</button>
       </form>
       <ul class="nav navbar-nav navbar-right">
-        <li><p class="navbar-text">Signed in as <a class="navbar-link" href="{{ url_for('view_user', user_id=session['logged_in_user']) }}">{{ session['logged_in_user'] }}</a></p></li>
+        <li><p class="navbar-text">Logged in as <a class="navbar-link" href="{{ url_for('view_user', user_id=session['logged_in_user']) }}">{{ session['logged_in_user'] }}</a></p></li>
       </ul>
       {% else %}
       <ul class = "nav navbar-nav navbar-right">
-        <li><a href="https://github.com/login/oauth/authorize?client_id={{ GITHUB_CLIENT_ID }}">Login</a></li>
-        <li><a href="{{ url_for('register') }}">Register</a></li>
+        <li><a href="{{ url_for('login', redirect_url=request.url) }}">Login with GitHub</a></li>
+        <li><img style="margin-top: 8px" src="/static/images/GitHub-Mark-Light-32px.png"></img></li>
       </ul>
       {% endif %}
       </ul>>

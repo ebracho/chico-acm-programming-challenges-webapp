@@ -1,4 +1,7 @@
 import os
+import binascii
+import requests
+from urllib.parse import urlencode, parse_qs
 from flask import Flask, request, session, render_template, redirect, \
                   url_for, g, flash, abort
 from flask_misaka import Misaka
@@ -12,7 +15,10 @@ from verify import supported_languages, verify
 app = Flask(__name__)
 Misaka(app) # Load Misaka extension (used for jinja2 markdown filter)
 app.secret_key = 'development_key'
+
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 # 1 MiB filesize limit
+app.config['GITHUB_CLIENT_ID'] = os.environ['GITHUB_CLIENT_ID']
+app.config['GITHUB_CLIENT_SECRET'] = os.environ['GITHUB_CLIENT_SECRET']
 
 
 #############################
@@ -61,12 +67,11 @@ def get_redirect_target(default='/'):
 
 def requires_login(view):
     """Decorator for views that require login. If user is not logged in,
-    redirects to login page then redirects back after login"""
+    redirects to github login page then redirects back after login"""
     @wraps(view)
     def decorator(*args, **kwargs):
         if 'logged_in_user' not in session:
-            flash('Please login first')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('login', redirect_url=request.url))
         return view(*args, **kwargs)
     return decorator
 
@@ -76,92 +81,47 @@ def requires_login(view):
 ### Views
 #############################
 
+def handle_github_login(session_code):
+    data = {
+        'client_id': app.config['GITHUB_CLIENT_ID'],
+        'client_secret': app.config['GITHUB_CLIENT_SECRET'],
+        'code': session_code,
+        'state': session.get('state', '')
+    }
+    result = requests.post(
+        'https://github.com/login/oauth/access_token', data=data)
+    qs = parse_qs(result.text)
+    access_token = qs['access_token']
+    result = requests.get(
+            'https://api.github.com/user', 
+            params={'access_token': access_token})
+    session['logged_in_user'] = result.json()['login']
+    return redirect(session.pop('redirect_url', url_for('home')))
+
+
 @app.route('/', methods=['GET'])
 def home():
+    # Handle github login request
+    if 'code' in request.args:
+        return handle_github_login(request.args['code'])
+
     db_session = get_db_session()
     problems = db_session.query(Problem).all()
     return render_template('home.html', problems=problems)
-        
-
-@app.route('/register', methods=['GET'])
-def register_form():
-    return render_template('register.html', validation={}, form_cache={})
-
-
-@app.route('/register', methods=['POST'])
-def register():
-    db_session = get_db_session()
-    user_id = request.form.get('user-id', '')
-    password = request.form.get('password', '')
-    confirm_password = request.form.get('confirm-password', '')
-    next = get_redirect_target()
-
-    validation = {}
-    form_cache = {}
-
-    # user_id validation
-    if not user_id:
-        validation['user_id'] = { 'level': 'error', 'msg': 'Required field.' }
-    elif not (3 <= len(user_id) <= 15):
-        validation['user_id'] = { 'level': 'warning', 'msg': 'User id must be between 3 and 15 characters' }
-    elif not user_id.isalnum():
-        validation['user_id'] = { 'level': 'warning', 'msg': 'User id may contain only letters and numbers' }
-    elif User.exists(db_session, user_id):
-        validation['user_id'] = { 'level': 'error', 'msg': 'User id is taken.' }
-
-    # password validation
-    if not password:
-        validation['password'] = { 'level': 'error', 'msg': 'Required field.' }
-    elif not (7 <= len(password) <= 128):
-        validation['password'] = { 'level': 'warning', 'msg': 'Password must be between 7 and 128 characters.' }
-
-    # confirm_password validation
-    if not confirm_password:
-        validation['confirm_password'] = { 'level': 'error', 'msg': 'Required field.' }
-    elif password != confirm_password:
-        validation['confirm_password'] = { 'level': 'warning', 'msg': 'Passwords do not match.' }
-
-    if validation:
-        form_cache = { 'user_id': user_id }
-        return render_template('register.html', next=next, validation=validation, form_cache=form_cache)
-
-    user = User(user_id, password)
-    db_session.add(user)
-    session['logged_in_user'] = user_id
-    return redirect(next)
-
 
 
 @app.route('/login', methods=['GET'])
-def login_form():
-    return render_template('login.html', validation={}, form_cache={})
-
-
-@app.route('/login', methods=['POST'])
 def login():
-    db_session = get_db_session()
-    user_id = request.form.get('user-id', '')
-    password = request.form.get('password', '')
-    next = get_redirect_target()
-
-    validation = {}
-    if not password:
-        validation['password'] = { 'level': 'error', 'msg': 'Required field' }
-    if not user_id:
-        validation['user_id'] = { 'level': 'error', 'msg': 'Required field' }
-    else:
-        user = db_session.query(User).filter(User.id == user_id).first()
-        if user is None or not user.auth(password):
-            validation['user_id'] = { 'level': 'error', 'msg': 'Invalid userid or password' }
-            validation['password'] = { 'level': 'error', 'msg': 'Invalid userid or password' }
-
-    if validation:
-        form_cache = { 'user_id': user_id }
-        return render_template('login.html', next=next, validation=validation, form_cache=form_cache)
-
-    session['logged_in_user'] = user_id
-    return redirect(next)
-    
+    state = binascii.hexlify(os.urandom(32)).decode('utf-8')
+    session['redirect_url'] = request.args.get('redirect_url', url_for('home'))
+    session['state'] = state
+    query = {
+        'client_id': app.config['GITHUB_CLIENT_ID'],
+        'state': state
+    }
+    return redirect(
+        'https://github.com/login/oauth/authorize/?' + urlencode(query))
+        
 
 @app.route('/logout', methods=['POST'])
 def logout():
