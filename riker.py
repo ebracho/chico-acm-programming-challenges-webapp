@@ -7,7 +7,7 @@ from flask import Flask, request, session, render_template, redirect, \
 from flask_misaka import Misaka
 from urllib.parse import urlparse, urljoin
 from functools import wraps
-from models import DBSession, User, Problem, Solution, ProblemComment, SolutionComment
+from models import DBSession, Problem, Solution, ProblemComment, SolutionComment
 from verify import supported_languages, verify
 
 
@@ -45,25 +45,6 @@ def after_request(response):
     close_db_session()
     return response
 
-
-def is_safe_url(target):
-    """Ensures that target url does not leave this domain"""
-    ref_url = urlparse(request.host_url)
-    test_url = urlparse(urljoin(request.host_url, target))
-    return test_url.scheme in ['http', 'https'] and \
-           ref_url.netloc == test_url.netloc
-
-
-def get_redirect_target(default='/'):
-    """Attempts to find redirect target in request."""
-    arg_next = request.args.get('next', None)
-    form_next = request.form.get('next', None)
-    for target in arg_next, form_next, default:
-        if not target:
-            continue
-        if is_safe_url(target):
-            return target
-            
 
 def requires_login(view):
     """Decorator for views that require login. If user is not logged in,
