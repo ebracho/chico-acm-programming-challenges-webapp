@@ -4,11 +4,8 @@
 
 
 <form action="/problem" method="post" enctype="multipart/form-data">
-
   <div class="row">
-
     <div class="col-md-9">
-
       <div class="form-group{{ ' has-' + validation['title']['level'] if 'title' in validation }}">
         <label class="control-label" for="title">Title:</label>
         <input type="text" name="title" class="form-control" value="{{ form_cache.get('title', '') }}"/>
@@ -16,113 +13,15 @@
         <span class="help-block">{{ validation['title']['msg'] }}</span>
         {% endif %}
       </div>
-
       <div class="form-group{{ ' has-' + validation['prompt']['level'] if 'prompt' in validation }}">
         <label class="control-label" for="prompt">Prompt:</label>
         <textarea name="prompt" class="form-control" rows="7">{{ form_cache.get('prompt', '') }}</textarea>
-        <small class="form-text pull-right"><a data-toggle="collapse" href="#formatting-help">formatting help</a></small>
         {% if 'prompt' in validation %}
         <span class="help-block">{{ validation['prompt']['msg'] }}</span>
         {% endif %}
       </div>
-
-      <!-- markdown guide -->
-      <div class="collapse" id="formatting-help">
-        <div class="well">
-          <table class="table">
-            <thead>
-              <tr>
-                <th><strong>Markdown</strong></th>
-                <th><strong>Output</strong></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>**text**</td>
-                <td><strong>text</strong></td>
-              </tr>
-              <tr>
-                <td>*text*</td>
-                <td><em>text</em></td>
-              </tr>
-              <tr>
-                <td>~~text~~</td>
-                <td><strike>text</strike></td>
-              </tr>
-              <tr>
-                <td>[link](google.com)</td>
-                <td><a href="google.com">link</a></td>
-              </tr>
-              <tr>
-                <td>`inline code`</td>
-                <td><code>inline code</code></td>
-              </tr>
-              <tr>
-                <td>![gentoo](http://i.imgur.com/vl3r2bo.png)</td>
-                <td><img src="http://i.imgur.com/vl3r2bo.png" alt="gentoo"></img></td>
-              </tr>
-              <tr>
-                <td>
-                  <p>
-                    * red<br/>
-                    * green<br/>
-                    * blue<br/>
-                  </p>
-                <td>
-                  <ul>
-                    <li>red</li>
-                    <li>green</li>
-                    <li>blue</li></ul>
-                  </ul>
-                </td>
-              <tr>
-                <td>
-                  <p>
-                    1 red<br/>
-                    2 green<br/>
-                    3 blue<br/>
-                  </p>
-                <td>
-                  <ol>
-                    <li>red</li>
-                    <li>green</li>
-                    <li>blue</li></ul>
-                  </ol>
-                </td>
-              </tr>
-              <tr>
-                <td>&gt Quoted Text</td>
-                <td><q>Quoted Text</q></td>
-              </tr>
-              <tr>
-                <td>
-                  <p>
-                    # Header 1<br/>
-                    ## Header 2<br/>
-                    ### Header 3<br/>
-                    #### Header 4<br/>
-                    ##### Header 5<br/>
-                    ###### Headter 6<br/>
-                  </p>
-                </td>
-                <td>
-                  <h1>Header 1</h1>
-                  <h2>Header 2</h2>
-                  <h3>Header 3</h3>
-                  <h4>Header 4</h4>
-                  <h5>Header 5</h5>
-                  <h6>Header 6</h6>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
     </div>
-
     <div class="col-md-3">
-
       <div class="form-group{{ ' has-' + validation['test_input_file']['level'] if 'test_input_file' in validation }}">
         <label class="control-label" for="test-input">Test Input:</label>
         <input type="file" name="test-input-file" class="btn btn-default" />
@@ -130,7 +29,6 @@
         <span class="help-block">{{ validation['test_input_file']['msg'] }}</span>
         {% endif %}
       </div>
-
       <div class="form-group{{ ' has-' + validation['test_output_file']['level'] if 'test_output_file' in validation }}">
         <label class="control-label" for="test-output">Test Output:</label>
         <input type="file" name="test-output-file" class="btn btn-default" />
@@ -138,7 +36,6 @@
         <span class="help-block">{{ validation['test_output_file']['msg'] }}</span>
         {% endif %}
       </div>
-
       <div class="form-group">
         <label class="control-label" for="timeout">Timeout:</label>
         <select name="timeout" id="timeout" class="form-control">
@@ -147,16 +44,12 @@
           {% endfor %}
         </select>
       </div>
-
       <div class="form-inline">
         <button type="submit" name="preview" value="preview-button" class="btn btn-default">Preview</button>
         <button type="submit" name="submit" value="submit-butotn" class="btn btn-primary">Submit</button>
       </div>
-
     </div>
-
   </div>
-
 </form>
 
 {% if preview %}
