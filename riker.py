@@ -205,11 +205,9 @@ def view_problem(problem_id):
         .order_by(ProblemComment.submission_time)
         .all()
     )
-    solved = 'logged_in_user' in session \
-              and problem.solved_by(db_session, session['logged_in_user'])
     return render_template(
         'view-problem.html', problem=problem, solutions=solutions, 
-        comments=comments, solved=solved)
+        comments=comments)
 
 
 @app.route('/problem/<problem_id>', methods=['POST']) # html forms don't support delete
@@ -297,7 +295,6 @@ def create_solution(problem_id):
 
 
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['GET'])
-@requires_login
 def view_solution(problem_id, solution_id):
     db_session = get_db_session()
     solution = (
@@ -307,8 +304,6 @@ def view_solution(problem_id, solution_id):
     )
     if solution is None:
         abort(404)
-    elif not solution.problem.solved_by(db_session, session['logged_in_user']):
-        return render_template('solution-not-solved.html')
     comments = (
         db_session.query(SolutionComment)
         .filter(SolutionComment.solution_id==solution_id)
@@ -455,11 +450,6 @@ def format_datetime(value):
     return value.strftime('%a %b %d %Y')
 
 
-
-import eventlet
-from eventlet import wsgi
-
 if __name__ == '__main__':
-    wsgi.server(eventlet.listen(('localhost', 8090)), app)
-    # app.run(host='0.0.0.0', port=80)
+    app.run(host='0.0.0.0', port=80)
 

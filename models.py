@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session, relationship
 
 
 
-engine = create_engine('sqlite:////var/www/servers/riker/app/riker.db')
+engine = create_engine('sqlite:///riker.db')
 DBSession = scoped_session(sessionmaker(engine))
 Base = declarative_base()
 
@@ -30,15 +30,6 @@ class Problem(Base):
     test_input = Column(String)
     test_output = Column(String)
     timeout = Column(Integer, default=3)
-
-    def solved_by(self, db_session, user_id):
-        user_solutions = (
-            db_session.query(Solution)
-            .filter(Solution.problem_id == self.id)
-            .filter(Solution.user_id == user_id)
-            .all()
-        )
-        return user_solutions is not None
 
     @staticmethod
     def exists(db_session, problem_id):

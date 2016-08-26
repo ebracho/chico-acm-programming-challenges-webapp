@@ -7,7 +7,7 @@ import multiprocess as mp
 
 supported_languages = ('c', 'c++', 'python', 'ruby', 'bash')
 verify_dir = os.path.dirname(os.path.realpath(__file__))
-run_script_path = os.path.join(verify_dir, 'run')
+entry_script_path = os.path.join(verify_dir, 'entry')
 
 
 class UnsupportedLanguage(Exception):
@@ -20,16 +20,18 @@ class ProgramTimeout(Exception):
     pass
 
 
-run_cmd = '{}/run {} {}'
+docker_run_cmd = """docker run --net=none -m 500m --ulimit nproc=30 
+    -v {0}:/home/unprivileged -w /home/unprivileged -e LANGUAGE={1} 
+    verify /bin/bash entry"""
 
 def run_program(language, source, testinput, timeout=3):
-    """Runs `source` with appropriate interpreter/compiler based on `langauge`
-    in an nsjail. Passes `testinput` to program's. Raises `ProgramTimeout` if
-    program executes for `timeout` seconds without terminating.
+    """Launches docker container to run `source` with given `language` and 
+    `testinput`. Returns stdout of program.
     """
     if language not in supported_languages:
         raise UnsupportedLanguage(language)
 
+    # Create program directory to be copied to docker container
     with TemporaryDirectory() as program_dir:
 
         program_path = os.path.join(program_dir, 'program')
@@ -39,7 +41,11 @@ def run_program(language, source, testinput, timeout=3):
             program_fd.write(source)
             testinput_fd.write(testinput)
 
-        args = shlex.split('{} {} {}'.format(run_script_path, language, program_dir))
+        # Copy entry script
+        shutil.copyfile(entry_script_path, os.path.join(program_dir, 'entry'))
+
+        # Build docker-run command
+        args = shlex.split(docker_run_cmd.format(program_dir, language))
 
         try:
             proc_obj = subprocess.run(

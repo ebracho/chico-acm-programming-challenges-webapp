@@ -1,0 +1,31 @@
+#!/bin/bash
+
+
+# Entry script for verification docker container.
+# Compiles/runs program based on LANGUAGE environment variable.
+
+
+case $LANGUAGE in
+	"bash")
+		/bin/bash program < testinput
+		;;
+	"ruby")
+		ruby program < testinput
+		;;
+	"python")
+		python3 program < testinput
+		;;
+	"c")
+		mv program program.c # gcc requires .c extension
+		gcc program.c -o program.out
+		./program.out < testinput
+		;;
+	"c++")
+		mv program program.cc
+		g++ program.cc -o program.out
+		./program.out < testinput
+		;;
+	*)
+		echo "Unknown language."
+esac
+

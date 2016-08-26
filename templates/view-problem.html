@@ -47,10 +47,8 @@
     <div class="well">
       {{ problem.prompt | markdown(no_html=True) }}
     </div>
-    <a class="btn btn-primary" href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a>
   </div>
 
-  {% if solved %}
   <!-- solution list -->
   <div class="col-md-4">
     <h3>Solutions</h3>
@@ -63,8 +61,8 @@
       <li>No solutions found</li>
       {% endfor %}
     </div>
+    <a class="btn btn-primary" href="{{ url_for('create_solution', problem_id=problem.id) }}">Submit Solution</a>
   </div>
-  {% endif %}
 
 </div>
 
