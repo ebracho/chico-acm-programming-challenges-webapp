@@ -6,7 +6,7 @@
 
 LANGUAGE=$1
 PROGRAM_DIR=$2
-NSJAIL="nsjail -Mo --log /dev/null --rlimit_nproc 40 --chroot / -- "
+NSJAIL="/usr/local/bin/nsjail -Mo --rlimit_nproc 40 --chroot / -- "
 
 
 case $LANGUAGE in
