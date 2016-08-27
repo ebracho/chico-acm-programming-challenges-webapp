@@ -7,7 +7,7 @@
 
   <div class="col-md-12">
 
-    <h2>Solution for <a href="{{ url_for('view_problem', problem_id=solution.problem_id) }}">{{ problem.title }}</a></h2>
+    <h2>Solution for <a href="{{ url_for('view_problem', problem_id=solution.problem_id) }}">{{ problem.title | e }}</a></h2>
     <p>Submitted by: <a href="{{ url_for('view_user', user_id=solution.user_id) }}">{{ solution.user_id }}</a></p>
     <p>Submission time: <em>{{ solution.submission_time | datetime }}</p></em>
     <p>Language: {{ solution.language }}</p>
@@ -17,7 +17,7 @@
     {% elif solution.verification == 'PENDING' %}
     <p>Verification: <span class="label label-warning">PENDING</span></p>
     {% else %}
-    <p>Verification: <span class="label label-danger">FAIL</span></p>
+    <p>Verification: <span class="label label-danger">FAIL</span><strong> {{ solution.verification }}</strong></p>
     {% endif %}
 
     {% if problem.user_id == session.get('logged_in_user', '') %}
@@ -255,6 +255,11 @@
   {% endif %}
 
 </div>
+
+<!-- highlightjs setup -->
+<link rel="stylesheet" href="/static/highlight/styles/default.css">
+<script src="/static/highlight/highlight.pack.js"></script>
+<script> hljs.initHighlightingOnLoad();</script>
 
 
 {% endblock %}
