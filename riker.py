@@ -450,6 +450,10 @@ def format_datetime(value):
     return value.strftime('%a %b %d %Y')
 
 
+
+from eventlet import wsgi
+import eventlet
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
+    wsgi.server(eventlet.listen(('0.0.0.0', 80)), app)
 

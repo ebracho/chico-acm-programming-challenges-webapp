@@ -20,7 +20,7 @@ class ProgramTimeout(Exception):
     pass
 
 
-docker_run_cmd = """docker run --net=none -m 500m --ulimit nproc=30 
+docker_run_cmd = """docker run --net=none -m 500m --pids-limit 40
     -v {0}:/home/unprivileged -w /home/unprivileged -e LANGUAGE={1} 
     verify /bin/bash entry"""
 
