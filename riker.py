@@ -455,5 +455,5 @@ from eventlet import wsgi
 import eventlet
 
 if __name__ == '__main__':
-    wsgi.server(eventlet.listen(('0.0.0.0', 80)), app)
+    wsgi.server(eventlet.listen(('127.0.0.1', 8091)), app)
 

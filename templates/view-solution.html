@@ -20,22 +20,22 @@
     <p>Verification: <span class="label label-danger">FAIL</span><strong> {{ solution.verification }}</strong></p>
     {% endif %}
 
-    {% if problem.user_id == session.get('logged_in_user', '') %}
-    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete-solution">Delete Problem</button>
-    <!-- delete problem modal -->
+    {% if solution.user_id == session.get('logged_in_user', '') %}
+    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#delete-solution">Delete Solution</button>
+    <!-- delete solution modal -->
     <div class="modal fade" id="delete-solution" tab-index="-1" role="dialog">
       <div class="modal-dialog modal-sm" role="document">
         <div class="modal-content">
           <div class="modal-header">
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-              <span aria-hidden="true">&times;</span>
+              <span>&times;</span>
             </button>
             <p>Are you sure?</p>
           </div>
           <div class="modal-body">
             <p>Deleting this solution will also remove all associated comments</p>
             <form action="{{ url_for('delete_solution', problem_id=problem.id, solution_id=solution.id) }}" method="post">
-              <button class="btn btn-danger" type="submit">Delete Problem</button>
+              <button class="btn btn-danger" type="submit">Delete Solution</button>
             </form>
           </div>
         </div>

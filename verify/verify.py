@@ -20,7 +20,7 @@ class ProgramTimeout(Exception):
     pass
 
 
-docker_run_cmd = """docker run --net=none -m 500m --pids-limit 40
+docker_run_cmd = """docker run --net=none --pids-limit 40
     -v {0}:/home/unprivileged -w /home/unprivileged -e LANGUAGE={1} 
     verify /bin/bash entry"""
 
@@ -66,6 +66,7 @@ def verify(language, source, testinput, testoutput, timeout=3):
     `run_program`."""
     try:
         output = run_program(language, source, testinput, timeout)
+        print(output)
         status = 'PASS' if output == testoutput else 'FAIL'
     except UnsupportedLanguage as e:
         status = 'Unsupported language'
