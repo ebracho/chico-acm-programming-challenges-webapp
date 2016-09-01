@@ -31,6 +31,17 @@ class Problem(Base):
     test_output = Column(String)
     timeout = Column(Integer, default=3)
 
+    def solved_by(self, db_session, user_id):
+        """Returns True if this problem has been solved by user_id"""
+        solutions = (
+            db_session.query(Solution)
+            .filter(Solution.user_id == user_id)
+            .filter(Solution.problem_id == self.id)
+            .filter(Solution.verification == 'PASS')
+            .first()
+        )
+        return solutions is not None
+
     @staticmethod
     def exists(db_session, problem_id):
         """Return True if problem_id exists"""
@@ -54,7 +65,7 @@ class Solution(Base):
     def verify(self):
         Solution._verify(self.id)
 
-    _verify_sem = eventlet.semaphore.Semaphore(4)
+    _verify_sem = eventlet.semaphore.Semaphore(1)
     @staticmethod
     def _verify(solution_id):
         """Verifies the correctness of the solution using `verify.verify`.

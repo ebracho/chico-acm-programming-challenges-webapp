@@ -2,13 +2,14 @@ import os
 import binascii
 import requests
 from urllib.parse import urlencode, parse_qs
+
 from flask import Flask, request, session, render_template, redirect, \
                   url_for, g, flash, abort
 from flask_misaka import Misaka
 from urllib.parse import urlparse, urljoin
 from functools import wraps
 from models import DBSession, Problem, Solution, ProblemComment, SolutionComment
-from verify import supported_languages, verify
+from verify import supported_languages 
 
 
 
@@ -205,9 +206,10 @@ def view_problem(problem_id):
         .order_by(ProblemComment.submission_time)
         .all()
     )
+    solved = 'logged_in_user' in session and problem.solved_by(db_session, session['logged_in_user'])
     return render_template(
         'view-problem.html', problem=problem, solutions=solutions, 
-        comments=comments)
+        comments=comments, solved=solved)
 
 
 @app.route('/problem/<problem_id>', methods=['POST']) # html forms don't support delete
@@ -262,6 +264,10 @@ def create_solution(problem_id):
     )
     if problem is None:
         abort(404)
+
+    ### DEBUG
+    print(problem.test_input)
+    ###
     
     source_file = request.files.get('source-file', None)
     language = request.form.get('language', None)
@@ -295,6 +301,7 @@ def create_solution(problem_id):
 
 
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['GET'])
+@requires_login
 def view_solution(problem_id, solution_id):
     db_session = get_db_session()
     solution = (
@@ -304,6 +311,8 @@ def view_solution(problem_id, solution_id):
     )
     if solution is None:
         abort(404)
+    if not solution.problem.solved_by(db_session, session['logged_in_user']):
+        return render_template('problem-not-solved.html')
     comments = (
         db_session.query(SolutionComment)
         .filter(SolutionComment.solution_id==solution_id)
