@@ -71,7 +71,7 @@ def verify(language, source, testinput, testoutput, timeout=3):
     except UnsupportedLanguage as e:
         status = 'Unsupported language'
     except ProgramError as e:
-        status = 'Program terminated due to error:\n {}'.format(str(e))
+        status = 'Program terminated due to error'
     except ProgramTimeout as e:
         status = 'Program timed out.'
     return status

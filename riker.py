@@ -308,20 +308,20 @@ def view_solution(problem_id, solution_id):
         db_session.query(Solution)
         .filter(Solution.id==solution_id)
         .first()
-    )
+    ) 
     if solution is None:
         abort(404)
-    if not solution.problem.solved_by(db_session, session['logged_in_user']):
-        return render_template('problem-not-solved.html')
     comments = (
         db_session.query(SolutionComment)
         .filter(SolutionComment.solution_id==solution_id)
         .order_by(SolutionComment.submission_time)
         .all()
     )
+    user = session['logged_in_user']
+    solution_viewable = (solution.user_id == user) or (solution.problem.solved_by(db_session, user))
     return render_template(
         'view-solution.html', problem=solution.problem, solution=solution, 
-        comments=comments)
+        comments=comments, solution_viewable=solution_viewable)
 
 
 @app.route('/problem/<problem_id>/solution/<solution_id>', methods=['POST']) # html forms don't support delete
